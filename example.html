@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebAudioKit 示例</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    
+    .section {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 4px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    button:hover {
+      background: #0056b3;
+    }
+    
+    button:active {
+      transform: scale(0.98);
+    }
+    
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .info {
+      margin: 10px 0;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 4px;
+    }
+    
+    input[type="range"] {
+      width: 200px;
+      vertical-align: middle;
+    }
+    
+    .lyric {
+      font-size: 18px;
+      color: #007bff;
+      text-align: center;
+      min-height: 30px;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎵 WebAudioKit 示例</h1>
+  
+  <!-- 音效示例 -->
+  <div class="section">
+    <h2>1. 音效（SoundEffect）</h2>
+    <p>音效可以重叠播放，播放完自动销毁</p>
+    <div class="controls">
+      <button onclick="playClickSound()">点击音效</button>
+      <button onclick="playExplosionSound()">爆炸音效</button>
+      <button onclick="playMultipleSounds()">播放多个音效</button>
+      <button onclick="stopAllSounds()">停止所有音效</button>
+    </div>
+  </div>
+  
+  <!-- 背景音乐示例 -->
+  <div class="section">
+    <h2>2. 背景音乐（AudioBGM）</h2>
+    <p>背景音乐不可重叠，支持淡入淡出效果</p>
+    <div class="controls">
+      <button onclick="playBGM()">播放 BGM</button>
+      <button onclick="switchBGM()">切换 BGM</button>
+      <button onclick="pauseBGM()">暂停 BGM</button>
+      <button onclick="stopBGM()">停止 BGM</button>
+    </div>
+  </div>
+  
+  <!-- 音乐播放器示例 -->
+  <div class="section">
+    <h2>3. 音乐播放器（Music）</h2>
+    <p>完整的音乐播放功能，支持歌词、元数据</p>
+    <div class="info">
+      <div><strong>标题：</strong><span id="musicTitle">-</span></div>
+      <div><strong>艺术家：</strong><span id="musicArtist">-</span></div>
+      <div><strong>进度：</strong><span id="musicProgress">0:00 / 0:00</span></div>
+    </div>
+    <div class="lyric" id="currentLyric">等待播放...</div>
+    <div class="controls">
+      <button onclick="playMusic()">播放音乐</button>
+      <button onclick="pauseMusic()">暂停音乐</button>
+      <button onclick="stopMusic()">停止音乐</button>
+    </div>
+  </div>
+  
+  <!-- 播放列表示例 -->
+  <div class="section">
+    <h2>4. 播放列表（MusicPlaylist）</h2>
+    <p>管理音乐列表和播放模式</p>
+    <div class="info">
+      <div><strong>当前：</strong><span id="playlistCurrent">-</span></div>
+      <div><strong>模式：</strong><span id="playlistMode">列表循环</span></div>
+    </div>
+    <div class="controls">
+      <button onclick="playlistPrevious()">上一首</button>
+      <button onclick="playlistPlay()">播放</button>
+      <button onclick="playlistNext()">下一首</button>
+      <button onclick="changePlayMode()">切换模式</button>
+    </div>
+  </div>
+  
+  <!-- 全局控制 -->
+  <div class="section">
+    <h2>5. 全局控制</h2>
+    <div class="controls">
+      <div>
+        <label>音量：</label>
+        <input type="range" id="volumeSlider" min="0" max="100" value="80" 
+               oninput="changeVolume(this.value)">
+        <span id="volumeValue">80%</span>
+      </div>
+      <button onclick="toggleMute()">静音/取消静音</button>
+    </div>
+    <div class="info">
+      <div><strong>状态：</strong><span id="globalStatus">正常</span></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { AudioManager, Music, PlayMode } from './dist/index.js';
+    
+    // 初始化音频管理器
+    const audioManager = AudioManager.getInstance({
+      volume: 0.8,
+      pauseOnHidden: true,
+      muted: false
+    });
+    
+    // 将实例暴露到全局，方便示例使用
+    window.audioManager = audioManager;
+    window.Music = Music;
+    window.PlayMode = PlayMode;
+    
+    console.log('WebAudioKit 已初始化');
+    console.log('注意：此示例需要实际的音频文件才能正常工作');
+  </script>
+
+  <script>
+    // 音效示例
+    function playClickSound() {
+      console.log('播放点击音效');
+      // audioManager.playSoundEffect('/sounds/click.mp3');
+      alert('需要提供实际的音频文件路径');
+    }
+    
+    function playExplosionSound() {
+      console.log('播放爆炸音效');
+      // audioManager.playSoundEffect('/sounds/explosion.mp3', { volume: 0.7 });
+      alert('需要提供实际的音频文件路径');
+    }
+    
+    function playMultipleSounds() {
+      console.log('播放多个音效');
+      // 模拟多个音效重叠播放
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          console.log(`播放音效 ${i + 1}`);
+          // audioManager.playSoundEffect('/sounds/beep.mp3');
+        }, i * 200);
+      }
+      alert('需要提供实际的音频文件路径');
+    }
+    
+    function stopAllSounds() {
+      audioManager.stopAllSoundEffects();
+      console.log('停止所有音效');
+    }
+    
+    // BGM 示例
+    function playBGM() {
+      console.log('播放 BGM');
+      // audioManager.playBGM('/music/background.mp3', {
+      //   loop: true,
+      //   fadeInDuration: 2000
+      // });
+      alert('需要提供实际的音频文件路径');
+    }
+    
+    function switchBGM() {
+      console.log('切换 BGM');
+      // audioManager.switchBGM('/music/battle.mp3', {
+      //   loop: true,
+      //   fadeInDuration: 1000
+      // });
+      alert('需要提供实际的音频文件路径');
+    }
+    
+    function pauseBGM() {
+      const bgm = audioManager.getCurrentBGM();
+      if (bgm) {
+        bgm.pause();
+        console.log('暂停 BGM');
+      }
+    }
+    
+    function stopBGM() {
+      audioManager.stopBGM();
+      console.log('停止 BGM');
+    }
+    
+    // 音乐示例
+    let currentMusic = null;
+    
+    function playMusic() {
+      console.log('播放音乐');
+      alert('需要提供实际的音频文件路径和歌词');
+      
+      // 示例代码：
+      // currentMusic = new Music('/music/song.mp3', {
+      //   metadata: {
+      //     title: '示例歌曲',
+      //     artist: '示例艺术家',
+      //     lrc: '[00:00.00]第一行歌词\n[00:05.00]第二行歌词'
+      //   }
+      // });
+      // 
+      // currentMusic.on('lyricchange', (lyric) => {
+      //   document.getElementById('currentLyric').textContent = lyric?.text || '';
+      // });
+      // 
+      // currentMusic.on('timeupdate', (data) => {
+      //   const current = formatTime(data.currentTime);
+      //   const total = formatTime(data.duration);
+      //   document.getElementById('musicProgress').textContent = `${current} / ${total}`;
+      // });
+      // 
+      // currentMusic.play();
+      // 
+      // const metadata = currentMusic.getMetadata();
+      // document.getElementById('musicTitle').textContent = metadata.title;
+      // document.getElementById('musicArtist').textContent = metadata.artist;
+    }
+    
+    function pauseMusic() {
+      if (currentMusic) {
+        currentMusic.pause();
+        console.log('暂停音乐');
+      }
+    }
+    
+    function stopMusic() {
+      if (currentMusic) {
+        currentMusic.stop();
+        console.log('停止音乐');
+      }
+    }
+    
+    // 播放列表示例
+    let currentPlayMode = 0;
+    const playModes = ['列表循环', '随机播放', '单曲循环', '顺序播放'];
+    
+    function playlistPlay() {
+      console.log('播放列表播放');
+      alert('需要先创建播放列表');
+    }
+    
+    function playlistNext() {
+      console.log('下一首');
+      // audioManager.playNextMusic();
+    }
+    
+    function playlistPrevious() {
+      console.log('上一首');
+      // audioManager.playPreviousMusic();
+    }
+    
+    function changePlayMode() {
+      currentPlayMode = (currentPlayMode + 1) % playModes.length;
+      document.getElementById('playlistMode').textContent = playModes[currentPlayMode];
+      console.log('切换播放模式:', playModes[currentPlayMode]);
+    }
+    
+    // 全局控制
+    function changeVolume(value) {
+      const volume = value / 100;
+      audioManager.setVolume(volume);
+      document.getElementById('volumeValue').textContent = value + '%';
+      console.log('设置音量:', volume);
+    }
+    
+    function toggleMute() {
+      const isMuted = audioManager.isMuted();
+      audioManager.setMuted(!isMuted);
+      document.getElementById('globalStatus').textContent = !isMuted ? '静音' : '正常';
+      console.log('静音状态:', !isMuted);
+    }
+    
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+  </script>
+</body>
+</html>

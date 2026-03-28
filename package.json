@@ -1,0 +1,55 @@
+{
+  "name": "webaudiokit",
+  "version": "0.0.1",
+  "description": "webaudiokit",
+  "license": "MIT",
+  "author": "Roy-Jin",
+  "type": "module",
+  "main": "dist/index.js",
+  "unpkg": "dist/index.global.js",
+  "jsdelivr": "dist/index.global.js",
+  "module": "dist/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.global.js",
+      "types": "./dist/types/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "clean": "rimraf dist",
+    "rebuild": "npm run clean && npm run build",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --run --coverage"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.5",
+    "rimraf": "^5.0.5",
+    "rollup": "^4.0.0",
+    "tslib": "^2.6.2",
+    "typescript": "^5.2.2"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "README_zh.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Roy-Jin/WebAudioKit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Roy-Jin/WebAudioKit/issues"
+  },
+  "homepage": "https://WebAudioKit.pages.dev",
+  "dependencies": {
+    "lrc-kit": "^1.2.1"
+  }
+}
