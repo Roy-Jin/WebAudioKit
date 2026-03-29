@@ -12,13 +12,13 @@ export abstract class BaseAudio {
 
   constructor(src: string) {
     this.audio = new Audio(src);
-    this.setupEventListeners();
+    this.setupEvents();
   }
 
   /**
    * 设置基础事件监听
    */
-  protected setupEventListeners(): void {
+  protected setupEvents(): void {
     this.audio.addEventListener('play', () => this.emit('play'));
     this.audio.addEventListener('pause', () => this.emit('pause'));
     this.audio.addEventListener('ended', () => this.emit('ended'));
@@ -110,12 +110,21 @@ export abstract class BaseAudio {
   /**
    * 获取/设置播放速率
    */
-  get playbackRate(): number {
+  get rate(): number {
     return this.audio.playbackRate;
   }
 
-  set playbackRate(value: number) {
+  set rate(value: number) {
     this.audio.playbackRate = value;
+  }
+
+  // 保留兼容性
+  get playbackRate(): number {
+    return this.rate;
+  }
+
+  set playbackRate(value: number) {
+    this.rate = value;
   }
 
   /**

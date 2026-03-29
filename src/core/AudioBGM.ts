@@ -7,17 +7,17 @@ import { BaseAudio } from './BaseAudio';
 import type { AudioOptions } from '../types';
 
 export class AudioBGM extends BaseAudio {
-  private fadeInDuration: number = 0;
-  private fadeOutDuration: number = 0;
-  private fadeInterval: number | null = null;
-  private targetVolume: number = 1;
+  private fadeInMs: number = 0;
+  private fadeOutMs: number = 0;
+  private fadeTimer: number | null = null;
+  private targetVol: number = 1;
 
   constructor(src: string, options: AudioOptions = {}) {
     super(src);
     
     // 应用配置
-    this.targetVolume = options.volume ?? 1;
-    this.volume = this.targetVolume;
+    this.targetVol = options.volume ?? 1;
+    this.volume = this.targetVol;
     
     if (options.playbackRate !== undefined) {
       this.playbackRate = options.playbackRate;
@@ -26,10 +26,10 @@ export class AudioBGM extends BaseAudio {
       this.loop = options.loop;
     }
     if (options.fadeInDuration !== undefined) {
-      this.fadeInDuration = options.fadeInDuration;
+      this.fadeInMs = options.fadeInDuration;
     }
     if (options.fadeOutDuration !== undefined) {
-      this.fadeOutDuration = options.fadeOutDuration;
+      this.fadeOutMs = options.fadeOutDuration;
     }
   }
 
@@ -37,7 +37,7 @@ export class AudioBGM extends BaseAudio {
    * 播放（支持淡入）
    */
   async play(): Promise<void> {
-    if (this.fadeInDuration > 0) {
+    if (this.fadeInMs > 0) {
       await this.fadeIn();
     } else {
       await super.play();
@@ -48,7 +48,7 @@ export class AudioBGM extends BaseAudio {
    * 停止（支持淡出）
    */
   stop(): void {
-    if (this.fadeOutDuration > 0) {
+    if (this.fadeOutMs > 0) {
       this.fadeOut().then(() => super.stop());
     } else {
       super.stop();
@@ -60,23 +60,23 @@ export class AudioBGM extends BaseAudio {
    */
   private async fadeIn(): Promise<void> {
     this.clearFade();
-    const startVolume = 0;
-    this.audio.volume = startVolume;
+    const startVol = 0;
+    this.audio.volume = startVol;
     
     await super.play();
     
     return new Promise((resolve) => {
-      const step = (this.targetVolume - startVolume) / (this.fadeInDuration / 50);
-      let currentVolume = startVolume;
+      const step = (this.targetVol - startVol) / (this.fadeInMs / 50);
+      let vol = startVol;
       
-      this.fadeInterval = window.setInterval(() => {
-        currentVolume += step;
-        if (currentVolume >= this.targetVolume) {
-          this.audio.volume = this.targetVolume;
+      this.fadeTimer = window.setInterval(() => {
+        vol += step;
+        if (vol >= this.targetVol) {
+          this.audio.volume = this.targetVol;
           this.clearFade();
           resolve();
         } else {
-          this.audio.volume = currentVolume;
+          this.audio.volume = vol;
         }
       }, 50);
     });
@@ -87,20 +87,20 @@ export class AudioBGM extends BaseAudio {
    */
   private async fadeOut(): Promise<void> {
     this.clearFade();
-    const startVolume = this.audio.volume;
+    const startVol = this.audio.volume;
     
     return new Promise((resolve) => {
-      const step = startVolume / (this.fadeOutDuration / 50);
-      let currentVolume = startVolume;
+      const step = startVol / (this.fadeOutMs / 50);
+      let vol = startVol;
       
-      this.fadeInterval = window.setInterval(() => {
-        currentVolume -= step;
-        if (currentVolume <= 0) {
+      this.fadeTimer = window.setInterval(() => {
+        vol -= step;
+        if (vol <= 0) {
           this.audio.volume = 0;
           this.clearFade();
           resolve();
         } else {
-          this.audio.volume = currentVolume;
+          this.audio.volume = vol;
         }
       }, 50);
     });
@@ -110,9 +110,9 @@ export class AudioBGM extends BaseAudio {
    * 清除淡入淡出定时器
    */
   private clearFade(): void {
-    if (this.fadeInterval !== null) {
-      clearInterval(this.fadeInterval);
-      this.fadeInterval = null;
+    if (this.fadeTimer !== null) {
+      clearInterval(this.fadeTimer);
+      this.fadeTimer = null;
     }
   }
 
@@ -120,7 +120,7 @@ export class AudioBGM extends BaseAudio {
    * 切换到新的BGM
    */
   async switchTo(newBGM: AudioBGM): Promise<void> {
-    if (this.fadeOutDuration > 0) {
+    if (this.fadeOutMs > 0) {
       await this.fadeOut();
     }
     this.stop();

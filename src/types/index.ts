@@ -117,16 +117,20 @@ export interface MetingData {
   id: string | number;
   /** 音乐名称 */
   name: string;
+  title?: string;
   /** 艺术家 */
   artist: string;
+  author?: string;
   /** 专辑 */
   album: string;
   /** 封面图片URL */
   pic: string;
+  cover?: string;
   /** 音频URL */
   url: string;
   /** 歌词URL */
   lrc: string;
+  lyric?: string;
 }
 
 /**

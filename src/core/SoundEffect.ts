@@ -21,7 +21,7 @@ export class SoundEffect extends BaseAudio {
     }
     if (options.loop !== undefined) {
       this.loop = options.loop;
-      this.autoDestroy = !options.loop; // 循环播放时不自动销毁
+      this.autoDestroy = !options.loop;
     }
 
     // 播放结束后自动销毁
@@ -35,7 +35,7 @@ export class SoundEffect extends BaseAudio {
   /**
    * 创建并播放音效（静态方法）
    */
-  static async playOnce(src: string, options: SoundEffectOptions = {}): Promise<SoundEffect> {
+  static async once(src: string, options: SoundEffectOptions = {}): Promise<SoundEffect> {
     const sound = new SoundEffect(src, options);
     await sound.play();
     return sound;
@@ -45,11 +45,10 @@ export class SoundEffect extends BaseAudio {
    * 克隆音效实例（用于重叠播放）
    */
   clone(): SoundEffect {
-    const cloned = new SoundEffect(this.audio.src, {
+    return new SoundEffect(this.audio.src, {
       volume: this.volume,
       playbackRate: this.playbackRate,
       loop: this.loop
     });
-    return cloned;
   }
 }
