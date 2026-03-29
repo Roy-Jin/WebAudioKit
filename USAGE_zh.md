@@ -1,20 +1,20 @@
-# Usage Guide
+# 使用指南
 
-Detailed examples and usage patterns for WebAudioKit.
+WebAudioKit 详细示例和使用模式。
 
-## Table of Contents
+## 目录
 
-- [BGM Examples](#bgm-examples)
-- [SFX Examples](#sfx-examples)
-- [Music Examples](#music-examples)
-- [MusicPlayer Examples](#musicplayer-examples)
-- [Advanced Patterns](#advanced-patterns)
+- [BGM 示例](#bgm-示例)
+- [SFX 示例](#sfx-示例)
+- [Music 示例](#music-示例)
+- [MusicPlayer 示例](#musicplayer-示例)
+- [高级模式](#高级模式)
 
 ---
 
-## BGM Examples
+## BGM 示例
 
-### Basic Usage
+### 基础用法
 
 ```javascript
 import { BGM } from 'webaudiokit';
@@ -26,44 +26,44 @@ const bgm = new BGM({
   fadeOut: 1000
 });
 
-// Load and play
+// 加载并播放
 await bgm.load('music/background.mp3');
 await bgm.play();
 
-// Control playback
+// 控制播放
 bgm.pause();
 await bgm.play();
 bgm.stop();
 ```
 
-### Smooth Transitions
+### 平滑过渡
 
 ```javascript
-// Switch between different BGM tracks
+// 在不同 BGM 曲目之间切换
 const bgm = new BGM({ fadeIn: 2000, fadeOut: 2000 });
 
 await bgm.load('music/menu.mp3');
 await bgm.play();
 
-// Later, switch to gameplay music
+// 稍后切换到游戏音乐
 await bgm.switch('music/gameplay.mp3');
 ```
 
-### Event Handling
+### 事件处理
 
 ```javascript
 const bgm = new BGM();
 
 bgm.on('play', () => {
-  console.log('BGM started playing');
+  console.log('BGM 开始播放');
 });
 
 bgm.on('ended', () => {
-  console.log('BGM finished');
+  console.log('BGM 播放结束');
 });
 
 bgm.on('error', (error) => {
-  console.error('BGM error:', error);
+  console.error('BGM 错误:', error);
 });
 
 await bgm.load('music/background.mp3');
@@ -72,9 +72,9 @@ await bgm.play();
 
 ---
 
-## SFX Examples
+## SFX 示例
 
-### Basic Sound Effects
+### 基础音效
 
 ```javascript
 import { SFX } from 'webaudiokit';
@@ -82,19 +82,19 @@ import { SFX } from 'webaudiokit';
 const clickSound = new SFX({ volume: 0.5 });
 await clickSound.load('sounds/click.mp3');
 
-// Play on button click
+// 按钮点击时播放
 button.addEventListener('click', async () => {
   await clickSound.play();
 });
 ```
 
-### Overlapping Sounds
+### 重叠播放
 
 ```javascript
 const gunSound = new SFX();
 await gunSound.load('sounds/gun.mp3');
 
-// Can play multiple times simultaneously
+// 可以同时播放多次
 await gunSound.play();
 await gunSound.play();
 await gunSound.play();
@@ -103,10 +103,10 @@ console.log(gunSound.activeCount); // 3
 ```
 
 
-### Multiple Sound Effects
+### 多个音效
 
 ```javascript
-// Create multiple SFX instances for different sounds
+// 为不同声音创建多个 SFX 实例
 const sounds = {
   click: new SFX(),
   hover: new SFX(),
@@ -114,7 +114,7 @@ const sounds = {
   error: new SFX()
 };
 
-// Load all sounds
+// 加载所有声音
 await Promise.all([
   sounds.click.load('sounds/click.mp3'),
   sounds.hover.load('sounds/hover.mp3'),
@@ -122,161 +122,161 @@ await Promise.all([
   sounds.error.load('sounds/error.mp3')
 ]);
 
-// Use them
+// 使用它们
 await sounds.click.play();
 await sounds.success.play();
 ```
 
 ---
 
-## Music Examples
+## Music 示例
 
-### Creating Music with Metadata
+### 创建带元数据的音乐
 
 ```javascript
 import { Music } from 'webaudiokit';
 
 const music = new Music('songs/song.mp3', {
-  title: 'Beautiful Song',
-  artist: 'Artist Name',
-  album: 'Album Name',
+  title: '美丽的歌曲',
+  artist: '艺术家名称',
+  album: '专辑名称',
   cover: 'covers/album.jpg'
 });
 
-console.log(music.meta.title); // 'Beautiful Song'
+console.log(music.meta.title); // '美丽的歌曲'
 ```
 
-### Working with Lyrics
+### 使用歌词
 
 ```javascript
 const lrcContent = `
-[00:00.00]First line of lyrics
-[00:05.50]Second line of lyrics
-[00:10.00]Third line of lyrics
+[00:00.00]第一行歌词
+[00:05.50]第二行歌词
+[00:10.00]第三行歌词
 `;
 
 const music = new Music('song.mp3', {
-  title: 'Song with Lyrics',
+  title: '带歌词的歌曲',
   lrc: lrcContent
 });
 
-// Get all lyrics
+// 获取所有歌词
 const lyrics = music.getLyrics();
 console.log(lyrics);
 // [
-//   { time: 0, text: 'First line of lyrics' },
-//   { time: 5.5, text: 'Second line of lyrics' },
-//   { time: 10, text: 'Third line of lyrics' }
+//   { time: 0, text: '第一行歌词' },
+//   { time: 5.5, text: '第二行歌词' },
+//   { time: 10, text: '第三行歌词' }
 // ]
 
-// Get lyric at specific time
+// 获取特定时间的歌词
 const lyric = music.getLyricAt(6);
-console.log(lyric?.text); // 'Second line of lyrics'
+console.log(lyric?.text); // '第二行歌词'
 ```
 
 ---
 
-## MusicPlayer Examples
+## MusicPlayer 示例
 
-### Basic Playlist
+### 基础播放列表
 
 ```javascript
 import { MusicPlayer, Music } from 'webaudiokit';
 
 const player = new MusicPlayer({ volume: 0.8 });
 
-// Add songs
-const song1 = new Music('songs/song1.mp3', { title: 'Song 1' });
-const song2 = new Music('songs/song2.mp3', { title: 'Song 2' });
-const song3 = new Music('songs/song3.mp3', { title: 'Song 3' });
+// 添加歌曲
+const song1 = new Music('songs/song1.mp3', { title: '歌曲 1' });
+const song2 = new Music('songs/song2.mp3', { title: '歌曲 2' });
+const song3 = new Music('songs/song3.mp3', { title: '歌曲 3' });
 
 player.addList([song1, song2, song3]);
 
-// Play
-await player.play(); // Plays first song
-await player.playNext(); // Plays second song
-await player.playPrev(); // Back to first song
+// 播放
+await player.play(); // 播放第一首
+await player.playNext(); // 播放第二首
+await player.playPrev(); // 返回第一首
 ```
 
-### Play Modes
+### 播放模式
 
 ```javascript
 import { MusicPlayer, PlayMode } from 'webaudiokit';
 
 const player = new MusicPlayer();
 
-// Sequential (default) - plays through once
+// 顺序播放（默认）- 播放一次
 player.playMode = PlayMode.SEQUENTIAL;
 
-// Loop - repeats playlist
+// 循环播放 - 重复播放列表
 player.playMode = PlayMode.LOOP;
 
-// Shuffle - random order
+// 随机播放 - 随机顺序
 player.playMode = PlayMode.SHUFFLE;
 
-// Single - repeat current track
+// 单曲循环 - 重复当前曲目
 player.playMode = PlayMode.SINGLE;
 ```
 
 
-### Event-Driven UI Updates
+### 事件驱动的 UI 更新
 
 ```javascript
 const player = new MusicPlayer();
 
-// Update UI when music changes
+// 音乐改变时更新 UI
 player.on('musicchange', (music) => {
   document.getElementById('title').textContent = music.meta.title;
   document.getElementById('artist').textContent = music.meta.artist;
   document.getElementById('cover').src = music.meta.cover;
 });
 
-// Update progress bar
+// 更新进度条
 player.on('timeupdate', ({ currentTime, duration }) => {
   const progress = (currentTime / duration) * 100;
   document.getElementById('progress').style.width = `${progress}%`;
 });
 
-// Display lyrics
+// 显示歌词
 player.on('lyricchange', (lyric) => {
   if (lyric) {
     document.getElementById('lyric').textContent = lyric.text;
   }
 });
 
-// Handle playlist changes
+// 处理播放列表变化
 player.on('playlistchange', () => {
-  console.log(`Playlist now has ${player.length} songs`);
+  console.log(`播放列表现在有 ${player.length} 首歌`);
 });
 ```
 
-### Seeking and Progress
+### 跳转和进度
 
 ```javascript
 const player = new MusicPlayer();
 
-// Jump to specific time
-player.currentTime = 60; // Jump to 1 minute
+// 跳转到特定时间
+player.currentTime = 60; // 跳转到 1 分钟
 
-// Jump to percentage
-player.progress = 0.5; // Jump to 50%
+// 跳转到百分比位置
+player.progress = 0.5; // 跳转到 50%
 
-// Get current position
-console.log(player.currentTime); // e.g., 45.2
-console.log(player.progress); // e.g., 0.3 (30%)
-console.log(player.duration); // e.g., 180 (3 minutes)
+// 获取当前位置
+console.log(player.currentTime); // 例如：45.2
+console.log(player.progress); // 例如：0.3 (30%)
+console.log(player.duration); // 例如：180 (3 分钟)
 ```
 
-### Loading from Meting API
+### 从 Meting API 加载
 
 ```javascript
-// Assuming you have Meting API data
+// 假设你有 Meting API 数据
 const metingData = [
   {
     id: '123',
-    name: 'Song Name',
-    artist: 'Artist',
-    album: 'Album',
+    name: '歌曲名称',
+    artist: '艺术家',
+    album: '专辑',
     pic: 'https://example.com/cover.jpg',
     url: 'https://example.com/song.mp3',
     lrc: 'https://example.com/lyrics.lrc'
@@ -290,9 +290,9 @@ await player.play();
 
 ---
 
-## Advanced Patterns
+## 高级模式
 
-### Game Audio Manager
+### 游戏音频管理器
 
 ```javascript
 import { BGM, SFX } from 'webaudiokit';
@@ -338,7 +338,7 @@ class GameAudio {
   }
 }
 
-// Usage
+// 使用
 const audio = new GameAudio();
 await audio.init();
 audio.startGame();
@@ -346,7 +346,7 @@ audio.playSound('jump');
 ```
 
 
-### Music Player with UI
+### 带 UI 的音乐播放器
 
 ```javascript
 import { MusicPlayer, Music, PlayMode } from 'webaudiokit';
@@ -358,34 +358,34 @@ class MusicPlayerUI {
   }
 
   setupEventListeners() {
-    // Playback events
+    // 播放事件
     this.player.on('play', () => {
-      document.getElementById('playBtn').textContent = 'Pause';
+      document.getElementById('playBtn').textContent = '暂停';
     });
 
     this.player.on('pause', () => {
-      document.getElementById('playBtn').textContent = 'Play';
+      document.getElementById('playBtn').textContent = '播放';
     });
 
-    // Music info updates
+    // 音乐信息更新
     this.player.on('musicchange', (music) => {
       this.updateMusicInfo(music);
     });
 
-    // Progress updates
+    // 进度更新
     this.player.on('timeupdate', ({ currentTime, duration }) => {
       this.updateProgress(currentTime, duration);
     });
 
-    // Lyric display
+    // 歌词显示
     this.player.on('lyricchange', (lyric) => {
       this.updateLyric(lyric);
     });
   }
 
   updateMusicInfo(music) {
-    document.getElementById('title').textContent = music.meta.title || 'Unknown';
-    document.getElementById('artist').textContent = music.meta.artist || 'Unknown';
+    document.getElementById('title').textContent = music.meta.title || '未知';
+    document.getElementById('artist').textContent = music.meta.artist || '未知';
     if (music.meta.cover) {
       document.getElementById('cover').src = music.meta.cover;
     }
@@ -441,19 +441,19 @@ class MusicPlayerUI {
   }
 }
 
-// Usage
+// 使用
 const ui = new MusicPlayerUI();
 await ui.addSongs([
-  { url: 'song1.mp3', metadata: { title: 'Song 1', artist: 'Artist 1' } },
-  { url: 'song2.mp3', metadata: { title: 'Song 2', artist: 'Artist 2' } }
+  { url: 'song1.mp3', metadata: { title: '歌曲 1', artist: '艺术家 1' } },
+  { url: 'song2.mp3', metadata: { title: '歌曲 2', artist: '艺术家 2' } }
 ]);
 await ui.play();
 ```
 
-### Preloading Strategy
+### 预加载策略
 
 ```javascript
-// Preload all audio assets at app start
+// 在应用启动时预加载所有音频资源
 async function preloadAudio() {
   const bgm = new BGM();
   const sfx = new SFX();
@@ -463,52 +463,52 @@ async function preloadAudio() {
       bgm.load('music/background.mp3'),
       sfx.load('sounds/click.mp3')
     ]);
-    console.log('Audio preloaded successfully');
+    console.log('音频预加载成功');
     return { bgm, sfx };
   } catch (error) {
-    console.error('Failed to preload audio:', error);
+    console.error('音频预加载失败:', error);
     throw error;
   }
 }
 
-// Use in app initialization
+// 在应用初始化时使用
 const audio = await preloadAudio();
 ```
 
-### Error Handling
+### 错误处理
 
 ```javascript
 const player = new MusicPlayer();
 
 player.on('error', (error) => {
-  console.error('Playback error:', error);
-  // Show error message to user
-  showNotification('Failed to play audio');
+  console.error('播放错误:', error);
+  // 向用户显示错误消息
+  showNotification('音频播放失败');
 });
 
 try {
   await player.play();
 } catch (error) {
-  console.error('Failed to start playback:', error);
-  // Handle error appropriately
+  console.error('启动播放失败:', error);
+  // 适当处理错误
 }
 ```
 
-### Cleanup
+### 资源清理
 
 ```javascript
-// Clean up when component unmounts or page unloads
+// 在组件卸载或页面卸载时清理
 function cleanup() {
   bgm.destroy();
   sfx.destroy();
   player.destroy();
 }
 
-// In React
+// 在 React 中
 useEffect(() => {
   return () => cleanup();
 }, []);
 
-// In vanilla JS
+// 在原生 JS 中
 window.addEventListener('beforeunload', cleanup);
 ```

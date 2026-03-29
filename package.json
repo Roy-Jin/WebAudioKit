@@ -51,7 +51,11 @@
     "dist",
     "LICENSE",
     "README.md",
-    "README_zh.md"
+    "README_zh.md",
+    "API.md",
+    "API_zh.md",
+    "USAGE.md",
+    "USAGE_zh.md"
   ],
   "repository": {
     "type": "git",

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAudioKit 测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        h2 {
+            color: #666;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:active {
+            background-color: #3d8b40;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .info {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebAudioKit 测试页面</h1>
+
+    <!-- BGM 测试区域 -->
+    <div class="section">
+        <h2>🎵 BGM (背景音乐) 测试</h2>
+        <div class="controls">
+            <button onclick="bgmPlay()">播放</button>
+            <button onclick="bgmPause()">暂停</button>
+            <button onclick="bgmStop()">停止</button>
+            <button onclick="bgmSwitch()">切换音乐</button>
+            <button onclick="bgmVolumeUp()">音量+</button>
+            <button onclick="bgmVolumeDown()">音量-</button>
+            <button onclick="bgmMute()">静音/取消静音</button>
+        </div>
+        <div class="info" id="bgm-info">等待操作...</div>
+    </div>
+
+    <!-- SFX 测试区域 -->
+    <div class="section">
+        <h2>🔊 SFX (音效) 测试 - 支持重叠播放</h2>
+        <div class="controls">
+            <button onclick="playSfx1()">播放音效 1</button>
+            <button onclick="playSfx2()">播放音效 2</button>
+            <button onclick="playSfx3()">播放音效 3</button>
+            <button onclick="rapidFire()">快速连发测试</button>
+            <button onclick="stopAllSfx()">停止所有音效</button>
+            <button onclick="sfxVolumeUp()">音量+</button>
+            <button onclick="sfxVolumeDown()">音量-</button>
+        </div>
+        <div class="info" id="sfx-info">等待操作...</div>
+    </div>
+
+    <script type="module">
+        // 引入 WebAudioKit
+        import { BGM, SFX } from '../dist/index.js';
+
+        // 初始化 BGM 实例
+        let currentBgm = new BGM({
+            volume: 0.5,
+            loop: true,
+            fadeIn: 1000,
+            fadeOut: 1000
+        });
+
+        const bgm2 = new BGM({
+            volume: 0.5,
+            loop: true,
+            fadeIn: 1000,
+            fadeOut: 1000
+        });
+
+        // 预加载 BGM
+        await currentBgm.load('assets/bgm_1.mp3');
+        await bgm2.load('assets/bgm_2.mp3');
+
+        // 初始化 SFX 实例
+        const sfx1 = new SFX({ volume: 0.7 });
+        const sfx2 = new SFX({ volume: 0.7 });
+        const sfx3 = new SFX({ volume: 0.7 });
+
+        // 预加载 SFX
+        await sfx1.load('assets/sfx_1.mp3');
+        await sfx2.load('assets/sfx_2.mp3');
+        await sfx3.load('assets/sfx_3.mp3');
+
+        // SFX 事件监听
+        sfx1.on('play', () => updateSfxInfo(`音效 1 播放 (活跃实例: ${sfx1.activeCount})`));
+        sfx2.on('play', () => updateSfxInfo(`音效 2 播放 (活跃实例: ${sfx2.activeCount})`));
+        sfx3.on('play', () => updateSfxInfo(`音效 3 播放 (活跃实例: ${sfx3.activeCount})`));
+        sfx1.on('ended', () => updateSfxInfo(`音效 1 结束 (活跃实例: ${sfx1.activeCount})`));
+        sfx2.on('ended', () => updateSfxInfo(`音效 2 结束 (活跃实例: ${sfx2.activeCount})`));
+        sfx3.on('ended', () => updateSfxInfo(`音效 3 结束 (活跃实例: ${sfx3.activeCount})`));
+
+        // BGM 事件监听
+        function setupBgmEvents(bgm) {
+            bgm.on('play', () => updateBgmInfo('播放中'));
+            bgm.on('pause', () => updateBgmInfo('已暂停'));
+            bgm.on('stop', () => updateBgmInfo('已停止'));
+            bgm.on('ended', () => updateBgmInfo('播放结束'));
+            bgm.on('volumechange', (vol) => updateBgmInfo(`音量变化: ${(vol * 100).toFixed(0)}%`));
+        }
+
+        setupBgmEvents(currentBgm);
+        setupBgmEvents(bgm2);
+
+        // 更新 BGM 信息显示
+        function updateBgmInfo(message) {
+            const info = document.getElementById('bgm-info');
+            const time = new Date().toLocaleTimeString();
+            info.textContent = `[${time}] ${message} | 当前音量: ${(currentBgm.volume * 100).toFixed(0)}% | 循环: ${currentBgm.loop ? '是' : '否'}`;
+        }
+
+        // 更新 SFX 信息显示
+        function updateSfxInfo(message) {
+            const info = document.getElementById('sfx-info');
+            const time = new Date().toLocaleTimeString();
+            info.textContent = `[${time}] ${message} | 音量: ${(sfx1.volume * 100).toFixed(0)}%`;
+        }
+
+        // BGM 控制函数
+        window.bgmPlay = () => {
+            currentBgm.play();
+            updateBgmInfo('开始播放');
+        };
+
+        window.bgmPause = () => {
+            currentBgm.pause();
+            updateBgmInfo('已暂停');
+        };
+
+        window.bgmStop = () => {
+            currentBgm.stop();
+        };
+
+        window.bgmSwitch = async () => {
+            // 切换到另一个 BGM
+            const nextSrc = currentBgm === bgm2 ? 'assets/bgm_1.mp3' : 'assets/bgm_2.mp3';
+            const nextBgm = currentBgm === bgm2 ? currentBgm : bgm2;
+            
+            await nextBgm.switch(nextSrc);
+            currentBgm = nextBgm;
+            setupBgmEvents(currentBgm);
+            updateBgmInfo('切换到下一首');
+        };
+
+        window.bgmVolumeUp = () => {
+            currentBgm.volume = Math.min(1, currentBgm.volume + 0.1);
+        };
+
+        window.bgmVolumeDown = () => {
+            currentBgm.volume = Math.max(0, currentBgm.volume - 0.1);
+        };
+
+        window.bgmMute = () => {
+            // Base 类没有 muted 属性，使用音量来模拟
+            if (currentBgm.volume > 0) {
+                window._lastVolume = currentBgm.volume;
+                currentBgm.volume = 0;
+                updateBgmInfo('已静音');
+            } else {
+                currentBgm.volume = window._lastVolume || 0.5;
+                updateBgmInfo('取消静音');
+            }
+        };
+
+        // SFX 控制函数
+        window.playSfx1 = () => {
+            sfx1.play();
+        };
+
+        window.playSfx2 = () => {
+            sfx2.play();
+        };
+
+        window.playSfx3 = () => {
+            sfx3.play();
+        };
+
+        // 快速连发测试 - 展示重叠播放能力
+        window.rapidFire = () => {
+            let count = 0;
+            const interval = setInterval(() => {
+                sfx1.play();
+                count++;
+                if (count >= 5) {
+                    clearInterval(interval);
+                    updateSfxInfo('快速连发完成！可以听到重叠播放效果');
+                }
+            }, 200);
+            updateSfxInfo('开始快速连发测试...');
+        };
+
+        // 停止所有音效
+        window.stopAllSfx = () => {
+            sfx1.stopAll();
+            sfx2.stopAll();
+            sfx3.stopAll();
+            updateSfxInfo('已停止所有音效');
+        };
+
+        window.sfxVolumeUp = () => {
+            const newVol = Math.min(1, sfx1.volume + 0.1);
+            sfx1.volume = newVol;
+            sfx2.volume = newVol;
+            sfx3.volume = newVol;
+            updateSfxInfo(`音量增加到 ${(newVol * 100).toFixed(0)}%`);
+        };
+
+        window.sfxVolumeDown = () => {
+            const newVol = Math.max(0, sfx1.volume - 0.1);
+            sfx1.volume = newVol;
+            sfx2.volume = newVol;
+            sfx3.volume = newVol;
+            updateSfxInfo(`音量减少到 ${(newVol * 100).toFixed(0)}%`);
+        };
+
+        // 初始化信息显示
+        updateBgmInfo('BGM 已初始化，支持淡入淡出效果');
+        updateSfxInfo('SFX 已初始化，支持重叠播放 - 可多次快速点击测试');
+    </script>
+</body>
+</html>

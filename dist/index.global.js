@@ -37,20 +37,242 @@
     };
 
     /**
-     * BaseAudio - 音频基类
-     * 所有音频类型的基础类
+     * SFX - 音效类
+     * 可重叠播放的音频效果
      */
-    class BaseAudio {
-        constructor(src) {
-            this._volume = 1;
+    class SFX {
+        constructor(options = {}) {
+            this.src = null;
+            this.defaultVolume = 1;
+            this.defaultRate = 1;
             this.eventListeners = new Map();
-            this.audio = new Audio(src);
-            this.setupEventListeners();
+            this.activeInstances = new Set();
+            this.isLoaded = false;
+            this.loadPromise = null;
+            if (options.volume !== undefined) {
+                this.defaultVolume = Math.max(0, Math.min(1, options.volume));
+            }
+            if (options.rate !== undefined) {
+                this.defaultRate = options.rate;
+            }
         }
         /**
-         * 设置基础事件监听
+         * 预加载音效资源
          */
-        setupEventListeners() {
+        load(src) {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (this.src === src && this.isLoaded) {
+                    return;
+                }
+                this.src = src;
+                this.isLoaded = false;
+                // 如果已有加载中的Promise，返回它
+                if (this.loadPromise) {
+                    return this.loadPromise;
+                }
+                this.loadPromise = new Promise((resolve, reject) => {
+                    const audio = new Audio(src);
+                    const onLoad = () => {
+                        this.isLoaded = true;
+                        this.loadPromise = null;
+                        this.emit('loaded');
+                        cleanup();
+                        resolve();
+                    };
+                    const onError = (e) => {
+                        this.loadPromise = null;
+                        this.emit('error', e);
+                        cleanup();
+                        reject(e);
+                    };
+                    const cleanup = () => {
+                        audio.removeEventListener('canplaythrough', onLoad);
+                        audio.removeEventListener('error', onError);
+                    };
+                    audio.addEventListener('canplaythrough', onLoad, { once: true });
+                    audio.addEventListener('error', onError, { once: true });
+                    audio.load();
+                });
+                return this.loadPromise;
+            });
+        }
+        /**
+         * 播放音效（每次创建新实例，支持重叠播放）
+         */
+        play() {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (!this.src) {
+                    throw new Error('SFX: No audio source loaded. Call load() first.');
+                }
+                const audio = new Audio(this.src);
+                audio.volume = this.defaultVolume;
+                audio.playbackRate = this.defaultRate;
+                this.activeInstances.add(audio);
+                audio.addEventListener('play', () => this.emit('play'));
+                audio.addEventListener('ended', () => {
+                    this.emit('ended');
+                    this.activeInstances.delete(audio);
+                });
+                audio.addEventListener('error', (e) => {
+                    this.emit('error', e);
+                    this.activeInstances.delete(audio);
+                });
+                try {
+                    yield audio.play();
+                }
+                catch (error) {
+                    this.emit('error', error);
+                    this.activeInstances.delete(audio);
+                    throw error;
+                }
+            });
+        }
+        /**
+         * 停止所有正在播放的音效实例
+         */
+        stopAll() {
+            this.activeInstances.forEach(audio => {
+                audio.pause();
+                audio.currentTime = 0;
+            });
+            this.activeInstances.clear();
+            this.emit('stop');
+        }
+        get volume() {
+            return this.defaultVolume;
+        }
+        set volume(value) {
+            this.defaultVolume = Math.max(0, Math.min(1, value));
+            this.activeInstances.forEach(audio => {
+                audio.volume = this.defaultVolume;
+            });
+            this.emit('volumechange', this.defaultVolume);
+        }
+        get rate() {
+            return this.defaultRate;
+        }
+        set rate(value) {
+            this.defaultRate = value;
+            this.activeInstances.forEach(audio => {
+                audio.playbackRate = this.defaultRate;
+            });
+        }
+        get activeCount() {
+            return this.activeInstances.size;
+        }
+        get loaded() {
+            return this.isLoaded;
+        }
+        on(event, listener) {
+            if (!this.eventListeners.has(event)) {
+                this.eventListeners.set(event, new Set());
+            }
+            this.eventListeners.get(event).add(listener);
+        }
+        off(event, listener) {
+            const listeners = this.eventListeners.get(event);
+            if (listeners) {
+                listeners.delete(listener);
+            }
+        }
+        emit(event, data) {
+            const listeners = this.eventListeners.get(event);
+            if (listeners) {
+                listeners.forEach(listener => listener(data));
+            }
+        }
+        destroy() {
+            this.stopAll();
+            this.eventListeners.clear();
+            this.src = null;
+            this.isLoaded = false;
+            this.loadPromise = null;
+        }
+    }
+
+    /**
+     * BGM - 背景音乐类
+     * 支持淡入淡出效果，不支持重叠播放
+     */
+    class BGM {
+        constructor(options = {}) {
+            this.audio = null;
+            this.src = null;
+            this.eventListeners = new Map();
+            this.fadeInMs = 0;
+            this.fadeOutMs = 0;
+            this.fadeTimer = null;
+            this.defaultVolume = 1;
+            this.defaultRate = 1;
+            this.defaultLoop = true;
+            this.isLoaded = false;
+            this.loadPromise = null;
+            if (options.volume !== undefined) {
+                this.defaultVolume = Math.max(0, Math.min(1, options.volume));
+            }
+            if (options.rate !== undefined) {
+                this.defaultRate = options.rate;
+            }
+            if (options.loop !== undefined) {
+                this.defaultLoop = options.loop;
+            }
+            if (options.fadeIn !== undefined) {
+                this.fadeInMs = options.fadeIn;
+            }
+            if (options.fadeOut !== undefined) {
+                this.fadeOutMs = options.fadeOut;
+            }
+        }
+        /**
+         * 预加载BGM资源
+         */
+        load(src) {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (this.src === src && this.isLoaded) {
+                    return;
+                }
+                // 如果正在播放，先停止
+                if (this.audio && !this.audio.paused) {
+                    this.stop();
+                }
+                this.src = src;
+                this.isLoaded = false;
+                if (this.loadPromise) {
+                    return this.loadPromise;
+                }
+                this.loadPromise = new Promise((resolve, reject) => {
+                    this.audio = new Audio(src);
+                    this.audio.volume = this.defaultVolume;
+                    this.audio.playbackRate = this.defaultRate;
+                    this.audio.loop = this.defaultLoop;
+                    this.setupEvents();
+                    const onLoad = () => {
+                        this.isLoaded = true;
+                        this.loadPromise = null;
+                        this.emit('loaded');
+                        cleanup();
+                        resolve();
+                    };
+                    const onError = (e) => {
+                        this.loadPromise = null;
+                        this.emit('error', e);
+                        cleanup();
+                        reject(e);
+                    };
+                    const cleanup = () => {
+                        this.audio.removeEventListener('canplaythrough', onLoad);
+                        this.audio.removeEventListener('error', onError);
+                    };
+                    this.audio.addEventListener('canplaythrough', onLoad, { once: true });
+                    this.audio.addEventListener('error', onError, { once: true });
+                    this.audio.load();
+                });
+                return this.loadPromise;
+            });
+        }
+        setupEvents() {
+            if (!this.audio)
+                return;
             this.audio.addEventListener('play', () => this.emit('play'));
             this.audio.addEventListener('pause', () => this.emit('pause'));
             this.audio.addEventListener('ended', () => this.emit('ended'));
@@ -59,13 +281,126 @@
                 duration: this.audio.duration
             }));
             this.audio.addEventListener('error', (e) => this.emit('error', e));
-            this.audio.addEventListener('loadeddata', () => this.emit('loaded'));
         }
-        /**
-         * 播放
-         */
         play() {
             return __awaiter(this, void 0, void 0, function* () {
+                if (!this.audio) {
+                    throw new Error('BGM: No audio source loaded. Call load() first.');
+                }
+                if (this.fadeInMs > 0) {
+                    yield this.fadeIn();
+                }
+                else {
+                    try {
+                        yield this.audio.play();
+                    }
+                    catch (error) {
+                        this.emit('error', error);
+                        throw error;
+                    }
+                }
+            });
+        }
+        pause() {
+            if (!this.audio)
+                return;
+            this.audio.pause();
+        }
+        stop() {
+            if (!this.audio)
+                return;
+            if (this.fadeOutMs > 0) {
+                this.fadeOut().then(() => {
+                    if (this.audio) {
+                        this.audio.pause();
+                        this.audio.currentTime = 0;
+                        this.emit('stop');
+                    }
+                });
+            }
+            else {
+                this.audio.pause();
+                this.audio.currentTime = 0;
+                this.emit('stop');
+            }
+        }
+        get volume() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.volume) !== null && _b !== void 0 ? _b : this.defaultVolume;
+        }
+        set volume(value) {
+            const vol = Math.max(0, Math.min(1, value));
+            this.defaultVolume = vol;
+            if (this.audio) {
+                this.audio.volume = vol;
+                this.emit('volumechange', vol);
+            }
+        }
+        get currentTime() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.currentTime) !== null && _b !== void 0 ? _b : 0;
+        }
+        set currentTime(value) {
+            if (this.audio) {
+                this.audio.currentTime = value;
+            }
+        }
+        get duration() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.duration) !== null && _b !== void 0 ? _b : 0;
+        }
+        get paused() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.paused) !== null && _b !== void 0 ? _b : true;
+        }
+        get loop() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.loop) !== null && _b !== void 0 ? _b : this.defaultLoop;
+        }
+        set loop(value) {
+            this.defaultLoop = value;
+            if (this.audio) {
+                this.audio.loop = value;
+            }
+        }
+        get rate() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.playbackRate) !== null && _b !== void 0 ? _b : this.defaultRate;
+        }
+        set rate(value) {
+            this.defaultRate = value;
+            if (this.audio) {
+                this.audio.playbackRate = value;
+            }
+        }
+        get loaded() {
+            return this.isLoaded;
+        }
+        on(event, listener) {
+            if (!this.eventListeners.has(event)) {
+                this.eventListeners.set(event, new Set());
+            }
+            this.eventListeners.get(event).add(listener);
+        }
+        off(event, listener) {
+            const listeners = this.eventListeners.get(event);
+            if (listeners) {
+                listeners.delete(listener);
+            }
+        }
+        emit(event, data) {
+            const listeners = this.eventListeners.get(event);
+            if (listeners) {
+                listeners.forEach(listener => listener(data));
+            }
+        }
+        fadeIn() {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (!this.audio)
+                    return;
+                this.clearFade();
+                const targetVolume = this.audio.volume;
+                this.audio.volume = 0;
                 try {
                     yield this.audio.play();
                 }
@@ -73,854 +408,89 @@
                     this.emit('error', error);
                     throw error;
                 }
-            });
-        }
-        /**
-         * 暂停
-         */
-        pause() {
-            this.audio.pause();
-        }
-        /**
-         * 停止
-         */
-        stop() {
-            this.audio.pause();
-            this.audio.currentTime = 0;
-            this.emit('stop');
-        }
-        /**
-         * 获取/设置音量
-         */
-        get volume() {
-            return this._volume;
-        }
-        set volume(value) {
-            this._volume = Math.max(0, Math.min(1, value));
-            this.audio.volume = this._volume;
-            this.emit('volumechange', this._volume);
-        }
-        /**
-         * 获取/设置当前播放时间
-         */
-        get currentTime() {
-            return this.audio.currentTime;
-        }
-        set currentTime(value) {
-            this.audio.currentTime = value;
-        }
-        /**
-         * 获取音频时长
-         */
-        get duration() {
-            return this.audio.duration || 0;
-        }
-        /**
-         * 获取播放状态
-         */
-        get paused() {
-            return this.audio.paused;
-        }
-        /**
-         * 获取/设置循环
-         */
-        get loop() {
-            return this.audio.loop;
-        }
-        set loop(value) {
-            this.audio.loop = value;
-        }
-        /**
-         * 获取/设置播放速率
-         */
-        get playbackRate() {
-            return this.audio.playbackRate;
-        }
-        set playbackRate(value) {
-            this.audio.playbackRate = value;
-        }
-        /**
-         * 添加事件监听器
-         */
-        on(event, listener) {
-            if (!this.eventListeners.has(event)) {
-                this.eventListeners.set(event, new Set());
-            }
-            this.eventListeners.get(event).add(listener);
-        }
-        /**
-         * 移除事件监听器
-         */
-        off(event, listener) {
-            const listeners = this.eventListeners.get(event);
-            if (listeners) {
-                listeners.delete(listener);
-            }
-        }
-        /**
-         * 触发事件
-         */
-        emit(event, data) {
-            const listeners = this.eventListeners.get(event);
-            if (listeners) {
-                listeners.forEach(listener => listener(data));
-            }
-        }
-        /**
-         * 销毁
-         */
-        destroy() {
-            this.stop();
-            this.audio.src = '';
-            this.audio.load();
-            this.eventListeners.clear();
-        }
-    }
-
-    /**
-     * SoundEffect - 音效类
-     * 可重叠播放的音频效果，播放完自动销毁
-     */
-    class SoundEffect extends BaseAudio {
-        constructor(src, options = {}) {
-            super(src);
-            this.autoDestroy = true;
-            // 应用配置
-            if (options.volume !== undefined) {
-                this.volume = options.volume;
-            }
-            if (options.playbackRate !== undefined) {
-                this.playbackRate = options.playbackRate;
-            }
-            if (options.loop !== undefined) {
-                this.loop = options.loop;
-                this.autoDestroy = !options.loop; // 循环播放时不自动销毁
-            }
-            // 播放结束后自动销毁
-            this.audio.addEventListener('ended', () => {
-                if (this.autoDestroy) {
-                    this.destroy();
-                }
-            });
-        }
-        /**
-         * 创建并播放音效（静态方法）
-         */
-        static playOnce(src_1) {
-            return __awaiter(this, arguments, void 0, function* (src, options = {}) {
-                const sound = new SoundEffect(src, options);
-                yield sound.play();
-                return sound;
-            });
-        }
-        /**
-         * 克隆音效实例（用于重叠播放）
-         */
-        clone() {
-            const cloned = new SoundEffect(this.audio.src, {
-                volume: this.volume,
-                playbackRate: this.playbackRate,
-                loop: this.loop
-            });
-            return cloned;
-        }
-    }
-
-    /**
-     * AudioBGM - 背景音乐类
-     * 不可重叠，只可切换，支持淡入淡出效果
-     */
-    class AudioBGM extends BaseAudio {
-        constructor(src, options = {}) {
-            var _a;
-            super(src);
-            this.fadeInDuration = 0;
-            this.fadeOutDuration = 0;
-            this.fadeInterval = null;
-            this.targetVolume = 1;
-            // 应用配置
-            this.targetVolume = (_a = options.volume) !== null && _a !== void 0 ? _a : 1;
-            this.volume = this.targetVolume;
-            if (options.playbackRate !== undefined) {
-                this.playbackRate = options.playbackRate;
-            }
-            if (options.loop !== undefined) {
-                this.loop = options.loop;
-            }
-            if (options.fadeInDuration !== undefined) {
-                this.fadeInDuration = options.fadeInDuration;
-            }
-            if (options.fadeOutDuration !== undefined) {
-                this.fadeOutDuration = options.fadeOutDuration;
-            }
-        }
-        /**
-         * 播放（支持淡入）
-         */
-        play() {
-            const _super = Object.create(null, {
-                play: { get: () => super.play }
-            });
-            return __awaiter(this, void 0, void 0, function* () {
-                if (this.fadeInDuration > 0) {
-                    yield this.fadeIn();
-                }
-                else {
-                    yield _super.play.call(this);
-                }
-            });
-        }
-        /**
-         * 停止（支持淡出）
-         */
-        stop() {
-            if (this.fadeOutDuration > 0) {
-                this.fadeOut().then(() => super.stop());
-            }
-            else {
-                super.stop();
-            }
-        }
-        /**
-         * 淡入效果
-         */
-        fadeIn() {
-            const _super = Object.create(null, {
-                play: { get: () => super.play }
-            });
-            return __awaiter(this, void 0, void 0, function* () {
-                this.clearFade();
-                const startVolume = 0;
-                this.audio.volume = startVolume;
-                yield _super.play.call(this);
                 return new Promise((resolve) => {
-                    const step = (this.targetVolume - startVolume) / (this.fadeInDuration / 50);
-                    let currentVolume = startVolume;
-                    this.fadeInterval = window.setInterval(() => {
-                        currentVolume += step;
-                        if (currentVolume >= this.targetVolume) {
-                            this.audio.volume = this.targetVolume;
+                    const step = targetVolume / (this.fadeInMs / 50);
+                    let vol = 0;
+                    this.fadeTimer = window.setInterval(() => {
+                        if (!this.audio) {
+                            this.clearFade();
+                            resolve();
+                            return;
+                        }
+                        vol += step;
+                        if (vol >= targetVolume) {
+                            this.audio.volume = targetVolume;
                             this.clearFade();
                             resolve();
                         }
                         else {
-                            this.audio.volume = currentVolume;
+                            this.audio.volume = vol;
                         }
                     }, 50);
                 });
             });
         }
-        /**
-         * 淡出效果
-         */
         fadeOut() {
             return __awaiter(this, void 0, void 0, function* () {
+                if (!this.audio)
+                    return;
                 this.clearFade();
                 const startVolume = this.audio.volume;
                 return new Promise((resolve) => {
-                    const step = startVolume / (this.fadeOutDuration / 50);
-                    let currentVolume = startVolume;
-                    this.fadeInterval = window.setInterval(() => {
-                        currentVolume -= step;
-                        if (currentVolume <= 0) {
+                    const step = startVolume / (this.fadeOutMs / 50);
+                    let vol = startVolume;
+                    this.fadeTimer = window.setInterval(() => {
+                        if (!this.audio) {
+                            this.clearFade();
+                            resolve();
+                            return;
+                        }
+                        vol -= step;
+                        if (vol <= 0) {
                             this.audio.volume = 0;
                             this.clearFade();
                             resolve();
                         }
                         else {
-                            this.audio.volume = currentVolume;
+                            this.audio.volume = vol;
                         }
                     }, 50);
                 });
             });
         }
-        /**
-         * 清除淡入淡出定时器
-         */
         clearFade() {
-            if (this.fadeInterval !== null) {
-                clearInterval(this.fadeInterval);
-                this.fadeInterval = null;
+            if (this.fadeTimer !== null) {
+                clearInterval(this.fadeTimer);
+                this.fadeTimer = null;
             }
         }
         /**
-         * 切换到新的BGM
+         * 切换到新的BGM源
          */
-        switchTo(newBGM) {
+        switch(src) {
             return __awaiter(this, void 0, void 0, function* () {
-                if (this.fadeOutDuration > 0) {
+                if (this.fadeOutMs > 0 && this.audio && !this.audio.paused) {
                     yield this.fadeOut();
                 }
                 this.stop();
-                yield newBGM.play();
+                yield this.load(src);
+                yield this.play();
             });
         }
-        /**
-         * 销毁
-         */
         destroy() {
             this.clearFade();
-            super.destroy();
+            this.stop();
+            if (this.audio) {
+                this.audio.src = '';
+                this.audio.load();
+                this.audio = null;
+            }
+            this.eventListeners.clear();
+            this.src = null;
+            this.isLoaded = false;
+            this.loadPromise = null;
         }
     }
-
-    /**
-     * WebAudioKit - Type Definitions
-     * 类型定义
-     */
-    /**
-     * 播放模式
-     */
-    exports.PlayMode = void 0;
-    (function (PlayMode) {
-        /** 列表循环 */
-        PlayMode["LOOP"] = "loop";
-        /** 随机播放 */
-        PlayMode["SHUFFLE"] = "shuffle";
-        /** 单曲循环 */
-        PlayMode["SINGLE"] = "single";
-        /** 顺序播放 */
-        PlayMode["SEQUENTIAL"] = "sequential";
-    })(exports.PlayMode || (exports.PlayMode = {}));
-    /**
-     * 播放状态
-     */
-    exports.PlayState = void 0;
-    (function (PlayState) {
-        /** 播放中 */
-        PlayState["PLAYING"] = "playing";
-        /** 暂停 */
-        PlayState["PAUSED"] = "paused";
-        /** 停止 */
-        PlayState["STOPPED"] = "stopped";
-        /** 加载中 */
-        PlayState["LOADING"] = "loading";
-        /** 错误 */
-        PlayState["ERROR"] = "error";
-    })(exports.PlayState || (exports.PlayState = {}));
-
-    /**
-     * MusicPlaylist - 音乐播放列表
-     * 管理音乐列表和播放模式
-     */
-    class MusicPlaylist {
-        constructor(musics = []) {
-            this.playlist = [];
-            this.currentIndex = -1;
-            this._playMode = exports.PlayMode.SEQUENTIAL;
-            this.shuffleIndices = [];
-            this.playlist = musics;
-            if (musics.length > 0) {
-                this.currentIndex = 0;
-            }
-        }
-        /**
-         * 添加音乐
-         */
-        add(music) {
-            this.playlist.push(music);
-            if (this.currentIndex === -1) {
-                this.currentIndex = 0;
-            }
-            this.updateShuffleIndices();
-        }
-        /**
-         * 移除音乐
-         */
-        remove(index) {
-            if (index >= 0 && index < this.playlist.length) {
-                this.playlist.splice(index, 1);
-                if (this.currentIndex >= this.playlist.length) {
-                    this.currentIndex = this.playlist.length - 1;
-                }
-                this.updateShuffleIndices();
-            }
-        }
-        /**
-         * 清空播放列表
-         */
-        clear() {
-            this.playlist = [];
-            this.currentIndex = -1;
-            this.shuffleIndices = [];
-        }
-        /**
-         * 获取当前音乐
-         */
-        getCurrentMusic() {
-            if (this.currentIndex >= 0 && this.currentIndex < this.playlist.length) {
-                return this.playlist[this.currentIndex];
-            }
-            return null;
-        }
-        /**
-         * 获取指定索引的音乐
-         */
-        getMusic(index) {
-            if (index >= 0 && index < this.playlist.length) {
-                return this.playlist[index];
-            }
-            return null;
-        }
-        /**
-         * 获取所有音乐
-         */
-        getAllMusic() {
-            return [...this.playlist];
-        }
-        /**
-         * 获取播放列表长度
-         */
-        get length() {
-            return this.playlist.length;
-        }
-        /**
-         * 获取当前索引
-         */
-        get index() {
-            return this.currentIndex;
-        }
-        /**
-         * 设置当前索引
-         */
-        set index(value) {
-            if (value >= 0 && value < this.playlist.length) {
-                this.currentIndex = value;
-            }
-        }
-        /**
-         * 获取/设置播放模式
-         */
-        get playMode() {
-            return this._playMode;
-        }
-        set playMode(mode) {
-            this._playMode = mode;
-            if (mode === exports.PlayMode.SHUFFLE) {
-                this.updateShuffleIndices();
-            }
-        }
-        /**
-         * 下一首
-         */
-        next() {
-            if (this.playlist.length === 0)
-                return null;
-            switch (this._playMode) {
-                case exports.PlayMode.SINGLE:
-                    // 单曲循环，返回当前歌曲
-                    return this.getCurrentMusic();
-                case exports.PlayMode.SHUFFLE:
-                    // 随机播放
-                    const currentShuffleIndex = this.shuffleIndices.indexOf(this.currentIndex);
-                    const nextShuffleIndex = (currentShuffleIndex + 1) % this.shuffleIndices.length;
-                    this.currentIndex = this.shuffleIndices[nextShuffleIndex];
-                    break;
-                case exports.PlayMode.LOOP:
-                    // 列表循环
-                    this.currentIndex = (this.currentIndex + 1) % this.playlist.length;
-                    break;
-                case exports.PlayMode.SEQUENTIAL:
-                    // 顺序播放
-                    if (this.currentIndex < this.playlist.length - 1) {
-                        this.currentIndex++;
-                    }
-                    else {
-                        return null; // 播放完毕
-                    }
-                    break;
-            }
-            return this.getCurrentMusic();
-        }
-        /**
-         * 上一首
-         */
-        previous() {
-            if (this.playlist.length === 0)
-                return null;
-            switch (this._playMode) {
-                case exports.PlayMode.SINGLE:
-                    // 单曲循环，返回当前歌曲
-                    return this.getCurrentMusic();
-                case exports.PlayMode.SHUFFLE:
-                    // 随机播放
-                    const currentShuffleIndex = this.shuffleIndices.indexOf(this.currentIndex);
-                    const prevShuffleIndex = currentShuffleIndex === 0
-                        ? this.shuffleIndices.length - 1
-                        : currentShuffleIndex - 1;
-                    this.currentIndex = this.shuffleIndices[prevShuffleIndex];
-                    break;
-                case exports.PlayMode.LOOP:
-                    // 列表循环
-                    this.currentIndex = this.currentIndex === 0
-                        ? this.playlist.length - 1
-                        : this.currentIndex - 1;
-                    break;
-                case exports.PlayMode.SEQUENTIAL:
-                    // 顺序播放
-                    if (this.currentIndex > 0) {
-                        this.currentIndex--;
-                    }
-                    else {
-                        return null;
-                    }
-                    break;
-            }
-            return this.getCurrentMusic();
-        }
-        /**
-         * 更新随机播放索引
-         */
-        updateShuffleIndices() {
-            this.shuffleIndices = Array.from({ length: this.playlist.length }, (_, i) => i);
-            // Fisher-Yates 洗牌算法
-            for (let i = this.shuffleIndices.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [this.shuffleIndices[i], this.shuffleIndices[j]] =
-                    [this.shuffleIndices[j], this.shuffleIndices[i]];
-            }
-        }
-    }
-
-    /**
-     * AudioManager - 音频管理器
-     * 管理所有音频实例和全局配置
-     */
-    class AudioManager {
-        constructor(config = {}) {
-            this.config = {
-                volume: 1,
-                pauseOnHidden: true,
-                muted: false
-            };
-            this.soundEffects = new Set();
-            this.currentBGM = null;
-            this.musicPlaylist = null;
-            this.visibilityChangeHandler = null;
-            this.updateConfig(config);
-            this.setupVisibilityHandler();
-        }
-        /**
-         * 获取单例实例
-         */
-        static getInstance(config) {
-            if (!AudioManager.instance) {
-                AudioManager.instance = new AudioManager(config);
-            }
-            return AudioManager.instance;
-        }
-        /**
-         * 更新配置
-         */
-        updateConfig(config) {
-            this.config = Object.assign(Object.assign({}, this.config), config);
-            // 应用全局音量
-            if (config.volume !== undefined) {
-                this.applyGlobalVolume();
-            }
-            // 应用静音状态
-            if (config.muted !== undefined) {
-                this.applyMutedState();
-            }
-        }
-        /**
-         * 获取配置
-         */
-        getConfig() {
-            return Object.assign({}, this.config);
-        }
-        /**
-         * 设置全局音量
-         */
-        setVolume(volume) {
-            this.config.volume = Math.max(0, Math.min(1, volume));
-            this.applyGlobalVolume();
-        }
-        /**
-         * 获取全局音量
-         */
-        getVolume() {
-            return this.config.volume;
-        }
-        /**
-         * 设置静音
-         */
-        setMuted(muted) {
-            this.config.muted = muted;
-            this.applyMutedState();
-        }
-        /**
-         * 获取静音状态
-         */
-        isMuted() {
-            return this.config.muted;
-        }
-        /**
-         * 应用全局音量
-         */
-        applyGlobalVolume() {
-            // 应用到所有音效
-            this.soundEffects.forEach(sound => {
-                sound.volume = this.config.volume;
-            });
-            // 应用到BGM
-            if (this.currentBGM) {
-                this.currentBGM.volume = this.config.volume;
-            }
-            // 应用到音乐播放列表
-            if (this.musicPlaylist) {
-                const currentMusic = this.musicPlaylist.getCurrentMusic();
-                if (currentMusic) {
-                    currentMusic.volume = this.config.volume;
-                }
-            }
-        }
-        /**
-         * 应用静音状态
-         */
-        applyMutedState() {
-            const volume = this.config.muted ? 0 : this.config.volume;
-            this.soundEffects.forEach(sound => {
-                sound.volume = volume;
-            });
-            if (this.currentBGM) {
-                this.currentBGM.volume = volume;
-            }
-            if (this.musicPlaylist) {
-                const currentMusic = this.musicPlaylist.getCurrentMusic();
-                if (currentMusic) {
-                    currentMusic.volume = volume;
-                }
-            }
-        }
-        /**
-         * 创建音效
-         */
-        createSoundEffect(src, options = {}) {
-            var _a;
-            const sound = new SoundEffect(src, Object.assign(Object.assign({}, options), { volume: (_a = options.volume) !== null && _a !== void 0 ? _a : this.config.volume }));
-            this.soundEffects.add(sound);
-            // 音效结束后从集合中移除
-            sound.on('ended', () => {
-                this.soundEffects.delete(sound);
-            });
-            return sound;
-        }
-        /**
-         * 播放音效（快捷方法）
-         */
-        playSoundEffect(src_1) {
-            return __awaiter(this, arguments, void 0, function* (src, options = {}) {
-                const sound = this.createSoundEffect(src, options);
-                yield sound.play();
-                return sound;
-            });
-        }
-        /**
-         * 停止所有音效
-         */
-        stopAllSoundEffects() {
-            this.soundEffects.forEach(sound => sound.stop());
-            this.soundEffects.clear();
-        }
-        /**
-         * 创建BGM
-         */
-        createBGM(src, options = {}) {
-            var _a;
-            const bgm = new AudioBGM(src, Object.assign(Object.assign({}, options), { volume: (_a = options.volume) !== null && _a !== void 0 ? _a : this.config.volume }));
-            return bgm;
-        }
-        /**
-         * 播放BGM
-         */
-        playBGM(src_1) {
-            return __awaiter(this, arguments, void 0, function* (src, options = {}) {
-                // 停止当前BGM
-                if (this.currentBGM) {
-                    this.currentBGM.stop();
-                }
-                const bgm = this.createBGM(src, options);
-                this.currentBGM = bgm;
-                yield bgm.play();
-                return bgm;
-            });
-        }
-        /**
-         * 切换BGM
-         */
-        switchBGM(src_1) {
-            return __awaiter(this, arguments, void 0, function* (src, options = {}) {
-                const newBGM = this.createBGM(src, options);
-                if (this.currentBGM) {
-                    yield this.currentBGM.switchTo(newBGM);
-                }
-                else {
-                    yield newBGM.play();
-                }
-                this.currentBGM = newBGM;
-                return newBGM;
-            });
-        }
-        /**
-         * 停止BGM
-         */
-        stopBGM() {
-            if (this.currentBGM) {
-                this.currentBGM.stop();
-                this.currentBGM = null;
-            }
-        }
-        /**
-         * 获取当前BGM
-         */
-        getCurrentBGM() {
-            return this.currentBGM;
-        }
-        /**
-         * 创建音乐播放列表
-         */
-        createMusicPlaylist(musics = []) {
-            this.musicPlaylist = new MusicPlaylist(musics);
-            return this.musicPlaylist;
-        }
-        /**
-         * 获取音乐播放列表
-         */
-        getMusicPlaylist() {
-            return this.musicPlaylist;
-        }
-        /**
-         * 播放音乐播放列表中的当前音乐
-         */
-        playCurrentMusic() {
-            return __awaiter(this, void 0, void 0, function* () {
-                if (!this.musicPlaylist)
-                    return;
-                const music = this.musicPlaylist.getCurrentMusic();
-                if (music) {
-                    music.volume = this.config.muted ? 0 : this.config.volume;
-                    yield music.play();
-                }
-            });
-        }
-        /**
-         * 播放下一首音乐
-         */
-        playNextMusic() {
-            return __awaiter(this, void 0, void 0, function* () {
-                if (!this.musicPlaylist)
-                    return;
-                const currentMusic = this.musicPlaylist.getCurrentMusic();
-                if (currentMusic) {
-                    currentMusic.stop();
-                }
-                const nextMusic = this.musicPlaylist.next();
-                if (nextMusic) {
-                    nextMusic.volume = this.config.muted ? 0 : this.config.volume;
-                    yield nextMusic.play();
-                }
-            });
-        }
-        /**
-         * 播放上一首音乐
-         */
-        playPreviousMusic() {
-            return __awaiter(this, void 0, void 0, function* () {
-                if (!this.musicPlaylist)
-                    return;
-                const currentMusic = this.musicPlaylist.getCurrentMusic();
-                if (currentMusic) {
-                    currentMusic.stop();
-                }
-                const prevMusic = this.musicPlaylist.previous();
-                if (prevMusic) {
-                    prevMusic.volume = this.config.muted ? 0 : this.config.volume;
-                    yield prevMusic.play();
-                }
-            });
-        }
-        /**
-         * 设置音乐播放模式
-         */
-        setMusicPlayMode(mode) {
-            if (this.musicPlaylist) {
-                this.musicPlaylist.playMode = mode;
-            }
-        }
-        /**
-         * 设置页面可见性处理
-         */
-        setupVisibilityHandler() {
-            this.visibilityChangeHandler = () => {
-                if (!this.config.pauseOnHidden)
-                    return;
-                if (document.hidden) {
-                    // 页面隐藏时暂停所有音频
-                    this.soundEffects.forEach(sound => {
-                        if (!sound.paused) {
-                            sound.pause();
-                            sound._wasPlayingBeforeHidden = true;
-                        }
-                    });
-                    if (this.currentBGM && !this.currentBGM.paused) {
-                        this.currentBGM.pause();
-                        this.currentBGM._wasPlayingBeforeHidden = true;
-                    }
-                    if (this.musicPlaylist) {
-                        const music = this.musicPlaylist.getCurrentMusic();
-                        if (music && !music.paused) {
-                            music.pause();
-                            music._wasPlayingBeforeHidden = true;
-                        }
-                    }
-                }
-                else {
-                    // 页面显示时恢复播放
-                    this.soundEffects.forEach(sound => {
-                        if (sound._wasPlayingBeforeHidden) {
-                            sound.play();
-                            delete sound._wasPlayingBeforeHidden;
-                        }
-                    });
-                    if (this.currentBGM && this.currentBGM._wasPlayingBeforeHidden) {
-                        this.currentBGM.play();
-                        delete this.currentBGM._wasPlayingBeforeHidden;
-                    }
-                    if (this.musicPlaylist) {
-                        const music = this.musicPlaylist.getCurrentMusic();
-                        if (music && music._wasPlayingBeforeHidden) {
-                            music.play();
-                            delete music._wasPlayingBeforeHidden;
-                        }
-                    }
-                }
-            };
-            document.addEventListener('visibilitychange', this.visibilityChangeHandler);
-        }
-        /**
-         * 销毁管理器
-         */
-        destroy() {
-            // 停止所有音效
-            this.stopAllSoundEffects();
-            // 停止BGM
-            this.stopBGM();
-            // 停止音乐
-            if (this.musicPlaylist) {
-                const music = this.musicPlaylist.getCurrentMusic();
-                if (music) {
-                    music.stop();
-                }
-            }
-            // 移除事件监听
-            if (this.visibilityChangeHandler) {
-                document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
-            }
-            AudioManager.instance = null;
-        }
-    }
-    AudioManager.instance = null;
 
     // match `[12:30.1][12:30.2]`
     const SQUARE_TAGS_REGEXP = /^(?:\s*\[[^\]]+\])+/;
@@ -1209,166 +779,594 @@
     }
 
     /**
-     * Music - 音乐类
-     * 具有完整元数据、歌词解析、播放列表等功能的音乐播放器
+     * Music - 音乐子类
+     * 表示单个音乐项，包含元数据和歌词
      */
-    class Music extends BaseAudio {
-        constructor(src, options = {}) {
-            super(src);
+    class Music {
+        constructor(src, metadata = {}) {
             this.lyrics = [];
-            this.currentLyricIndex = -1;
-            this._state = exports.PlayState.STOPPED;
-            this.metadata = options.metadata || {};
-            // 应用配置
-            if (options.volume !== undefined) {
-                this.volume = options.volume;
-            }
-            if (options.playbackRate !== undefined) {
-                this.playbackRate = options.playbackRate;
-            }
-            if (options.loop !== undefined) {
-                this.loop = options.loop;
-            }
-            // 解析歌词
+            this.eventListeners = new Map();
+            this.src = src;
+            this.metadata = metadata;
             if (this.metadata.lrc) {
                 this.parseLyrics(this.metadata.lrc);
             }
-            // 监听时间更新以同步歌词
-            this.on('timeupdate', () => this.updateCurrentLyric());
-            this.on('play', () => this._state = exports.PlayState.PLAYING);
-            this.on('pause', () => this._state = exports.PlayState.PAUSED);
-            this.on('stop', () => this._state = exports.PlayState.STOPPED);
-            this.on('error', () => this._state = exports.PlayState.ERROR);
         }
-        /**
-         * 从Meting API数据创建音乐实例
-         */
-        static fromMetingData(data_1) {
-            return __awaiter(this, arguments, void 0, function* (data, options = {}) {
-                const metadata = {
-                    title: data.name,
-                    artist: data.artist,
-                    album: data.album,
-                    cover: data.pic
-                };
-                // 如果有歌词URL，获取歌词
-                if (data.lrc) {
-                    try {
-                        const response = yield fetch(data.lrc);
-                        metadata.lrc = yield response.text();
-                    }
-                    catch (error) {
-                        console.warn('Failed to fetch lyrics:', error);
-                    }
+        get url() {
+            return this.src;
+        }
+        get meta() {
+            return Object.assign({}, this.metadata);
+        }
+        set meta(data) {
+            this.metadata = Object.assign(Object.assign({}, this.metadata), data);
+            if (data.lrc) {
+                this.parseLyrics(data.lrc);
+            }
+        }
+        getLyrics() {
+            return [...this.lyrics];
+        }
+        getLyricAt(time) {
+            if (this.lyrics.length === 0)
+                return null;
+            let index = -1;
+            for (let i = 0; i < this.lyrics.length; i++) {
+                if (time >= this.lyrics[i].time) {
+                    index = i;
                 }
-                return new Music(data.url, Object.assign(Object.assign({}, options), { metadata }));
-            });
+                else {
+                    break;
+                }
+            }
+            return index >= 0 ? this.lyrics[index] : null;
         }
-        /**
-         * 解析LRC歌词
-         */
-        parseLyrics(lrcText) {
+        parseLyrics(text) {
             try {
-                const lrc = Lrc.parse(lrcText);
+                const lrc = Lrc.parse(text);
                 this.lyrics = lrc.lyrics.map(line => ({
-                    time: line.timestamp / 1000, // 转换为秒
+                    time: line.timestamp,
                     text: line.content
                 }));
+                this.emit('lyricsloaded');
             }
             catch (error) {
                 console.warn('Failed to parse lyrics:', error);
                 this.lyrics = [];
             }
         }
+        on(event, listener) {
+            if (!this.eventListeners.has(event)) {
+                this.eventListeners.set(event, new Set());
+            }
+            this.eventListeners.get(event).add(listener);
+        }
+        off(event, listener) {
+            const listeners = this.eventListeners.get(event);
+            if (listeners) {
+                listeners.delete(listener);
+            }
+        }
+        emit(event, data) {
+            const listeners = this.eventListeners.get(event);
+            if (listeners) {
+                listeners.forEach(listener => listener(data));
+            }
+        }
+    }
+
+    /**
+     * WebAudioKit - Type Definitions
+     */
+    /**
+     * 播放模式
+     */
+    exports.PlayMode = void 0;
+    (function (PlayMode) {
+        PlayMode["LOOP"] = "loop";
+        PlayMode["SHUFFLE"] = "shuffle";
+        PlayMode["SINGLE"] = "single";
+        PlayMode["SEQUENTIAL"] = "sequential";
+    })(exports.PlayMode || (exports.PlayMode = {}));
+    /**
+     * 播放状态
+     */
+    exports.PlayState = void 0;
+    (function (PlayState) {
+        PlayState["PLAYING"] = "playing";
+        PlayState["PAUSED"] = "paused";
+        PlayState["STOPPED"] = "stopped";
+        PlayState["LOADING"] = "loading";
+        PlayState["ERROR"] = "error";
+    })(exports.PlayState || (exports.PlayState = {}));
+
+    /**
+     * MusicPlayer - 音乐播放器类
+     * 管理播放列表，支持多种播放模式
+     */
+    class MusicPlayer {
+        constructor(options = {}) {
+            this.audio = null;
+            this.eventListeners = new Map();
+            this._state = exports.PlayState.STOPPED;
+            this.lyricIndex = -1;
+            this.playlist = [];
+            this.index = -1;
+            this.mode = exports.PlayMode.SEQUENTIAL;
+            this.shuffleOrder = [];
+            this.defaultVolume = 1;
+            this.defaultRate = 1;
+            this.defaultLoop = false;
+            if (options.volume !== undefined) {
+                this.defaultVolume = Math.max(0, Math.min(1, options.volume));
+            }
+            if (options.rate !== undefined) {
+                this.defaultRate = options.rate;
+            }
+            if (options.loop !== undefined) {
+                this.defaultLoop = options.loop;
+            }
+            if (options.mode !== undefined) {
+                this.mode = options.mode;
+            }
+        }
         /**
-         * 更新当前歌词
+         * 添加音乐到播放列表
          */
-        updateCurrentLyric() {
-            if (this.lyrics.length === 0)
+        add(music) {
+            this.playlist.push(music);
+            if (this.index === -1) {
+                this.index = 0;
+            }
+            this.updateShuffle();
+            this.emit('playlistchange');
+        }
+        /**
+         * 批量添加音乐到播放列表
+         */
+        addList(musicList) {
+            this.playlist.push(...musicList);
+            if (this.index === -1 && this.playlist.length > 0) {
+                this.index = 0;
+            }
+            this.updateShuffle();
+            this.emit('playlistchange');
+        }
+        /**
+         * 从Meting API数据添加到播放列表
+         */
+        addFromMeting(data) {
+            return __awaiter(this, void 0, void 0, function* () {
+                var _a, _b, _c, _d, _e;
+                const musicList = [];
+                for (const item of data) {
+                    const metadata = {
+                        title: (_a = item.name) !== null && _a !== void 0 ? _a : item.title,
+                        artist: (_b = item.artist) !== null && _b !== void 0 ? _b : item.author,
+                        album: (_c = item.album) !== null && _c !== void 0 ? _c : "",
+                        cover: (_d = item.pic) !== null && _d !== void 0 ? _d : item.cover,
+                    };
+                    // 获取歌词
+                    if (item.lrc || item.lyric) {
+                        try {
+                            const response = yield fetch((_e = item.lrc) !== null && _e !== void 0 ? _e : item.lyric);
+                            metadata.lrc = yield response.text();
+                        }
+                        catch (error) {
+                            console.warn('Failed to fetch lyrics:', error);
+                        }
+                    }
+                    const music = new Music(item.url, metadata);
+                    musicList.push(music);
+                }
+                this.addList(musicList);
+            });
+        }
+        /**
+         * 从播放列表移除
+         */
+        remove(idx) {
+            if (idx >= 0 && idx < this.playlist.length) {
+                this.playlist.splice(idx, 1);
+                if (this.index >= this.playlist.length) {
+                    this.index = this.playlist.length - 1;
+                }
+                this.updateShuffle();
+                this.emit('playlistchange');
+            }
+        }
+        /**
+         * 清空播放列表
+         */
+        clear() {
+            this.stop();
+            this.playlist = [];
+            this.index = -1;
+            this.shuffleOrder = [];
+            this.emit('playlistchange');
+        }
+        /**
+         * 加载指定索引的音乐
+         */
+        loadMusic(idx) {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (idx < 0 || idx >= this.playlist.length) {
+                    throw new Error('Invalid music index');
+                }
+                const music = this.playlist[idx];
+                const wasPlaying = this.audio && !this.audio.paused;
+                // 停止当前播放
+                if (this.audio) {
+                    this.audio.pause();
+                    this.audio.src = '';
+                }
+                // 创建新的audio实例
+                this.audio = new Audio(music.url);
+                this.audio.volume = this.defaultVolume;
+                this.audio.playbackRate = this.defaultRate;
+                this.audio.loop = this.defaultLoop;
+                this.setupEvents();
+                this.index = idx;
+                this.lyricIndex = -1;
+                this._state = exports.PlayState.LOADING;
+                this.emit('musicchange', music);
+                // 等待加载
+                yield new Promise((resolve, reject) => {
+                    const onLoad = () => {
+                        cleanup();
+                        resolve();
+                    };
+                    const onError = (e) => {
+                        this._state = exports.PlayState.ERROR;
+                        cleanup();
+                        reject(e);
+                    };
+                    const cleanup = () => {
+                        this.audio.removeEventListener('canplaythrough', onLoad);
+                        this.audio.removeEventListener('error', onError);
+                    };
+                    this.audio.addEventListener('canplaythrough', onLoad, { once: true });
+                    this.audio.addEventListener('error', onError, { once: true });
+                    this.audio.load();
+                });
+                // 如果之前在播放，自动播放新音乐
+                if (wasPlaying) {
+                    yield this.play();
+                }
+            });
+        }
+        setupEvents() {
+            if (!this.audio)
                 return;
-            const currentTime = this.currentTime;
+            this.audio.addEventListener('play', () => {
+                this._state = exports.PlayState.PLAYING;
+                this.emit('play');
+            });
+            this.audio.addEventListener('pause', () => {
+                this._state = exports.PlayState.PAUSED;
+                this.emit('pause');
+            });
+            this.audio.addEventListener('ended', () => {
+                this.emit('ended');
+                this.handleEnded();
+            });
+            this.audio.addEventListener('timeupdate', () => {
+                this.emit('timeupdate', {
+                    currentTime: this.audio.currentTime,
+                    duration: this.audio.duration
+                });
+                this.updateLyric();
+            });
+            this.audio.addEventListener('error', (e) => {
+                this._state = exports.PlayState.ERROR;
+                this.emit('error', e);
+            });
+        }
+        handleEnded() {
+            return __awaiter(this, void 0, void 0, function* () {
+                const nextMusic = this.next();
+                if (nextMusic) {
+                    yield this.loadMusic(this.index);
+                    yield this.play();
+                }
+                else {
+                    this._state = exports.PlayState.STOPPED;
+                    this.emit('stop');
+                }
+            });
+        }
+        play(idx) {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (idx !== undefined) {
+                    yield this.loadMusic(idx);
+                }
+                if (!this.audio) {
+                    if (this.playlist.length > 0 && this.index >= 0) {
+                        yield this.loadMusic(this.index);
+                    }
+                    else {
+                        throw new Error('No music to play');
+                    }
+                }
+                try {
+                    yield this.audio.play();
+                }
+                catch (error) {
+                    this._state = exports.PlayState.ERROR;
+                    this.emit('error', error);
+                    throw error;
+                }
+            });
+        }
+        pause() {
+            if (this.audio) {
+                this.audio.pause();
+            }
+        }
+        stop() {
+            if (this.audio) {
+                this.audio.pause();
+                this.audio.currentTime = 0;
+                this._state = exports.PlayState.STOPPED;
+                this.emit('stop');
+            }
+        }
+        /**
+         * 下一首
+         */
+        next() {
+            if (this.playlist.length === 0)
+                return null;
+            switch (this.mode) {
+                case exports.PlayMode.SINGLE:
+                    return this.current;
+                case exports.PlayMode.SHUFFLE:
+                    const currIdx = this.shuffleOrder.indexOf(this.index);
+                    const nextIdx = (currIdx + 1) % this.shuffleOrder.length;
+                    this.index = this.shuffleOrder[nextIdx];
+                    break;
+                case exports.PlayMode.LOOP:
+                    this.index = (this.index + 1) % this.playlist.length;
+                    break;
+                case exports.PlayMode.SEQUENTIAL:
+                    if (this.index < this.playlist.length - 1) {
+                        this.index++;
+                    }
+                    else {
+                        return null;
+                    }
+                    break;
+            }
+            return this.current;
+        }
+        /**
+         * 上一首
+         */
+        prev() {
+            if (this.playlist.length === 0)
+                return null;
+            switch (this.mode) {
+                case exports.PlayMode.SINGLE:
+                    return this.current;
+                case exports.PlayMode.SHUFFLE:
+                    const currIdx = this.shuffleOrder.indexOf(this.index);
+                    const prevIdx = currIdx === 0 ? this.shuffleOrder.length - 1 : currIdx - 1;
+                    this.index = this.shuffleOrder[prevIdx];
+                    break;
+                case exports.PlayMode.LOOP:
+                    this.index = this.index === 0 ? this.playlist.length - 1 : this.index - 1;
+                    break;
+                case exports.PlayMode.SEQUENTIAL:
+                    if (this.index > 0) {
+                        this.index--;
+                    }
+                    else {
+                        return null;
+                    }
+                    break;
+            }
+            return this.current;
+        }
+        /**
+         * 播放下一首
+         */
+        playNext() {
+            return __awaiter(this, void 0, void 0, function* () {
+                const nextMusic = this.next();
+                if (nextMusic) {
+                    yield this.loadMusic(this.index);
+                    yield this.play();
+                }
+            });
+        }
+        /**
+         * 播放上一首
+         */
+        playPrev() {
+            return __awaiter(this, void 0, void 0, function* () {
+                const prevMusic = this.prev();
+                if (prevMusic) {
+                    yield this.loadMusic(this.index);
+                    yield this.play();
+                }
+            });
+        }
+        updateShuffle() {
+            this.shuffleOrder = Array.from({ length: this.playlist.length }, (_, i) => i);
+            for (let i = this.shuffleOrder.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [this.shuffleOrder[i], this.shuffleOrder[j]] =
+                    [this.shuffleOrder[j], this.shuffleOrder[i]];
+            }
+        }
+        updateLyric() {
+            const music = this.current;
+            if (!music)
+                return;
+            const lyrics = music.getLyrics();
+            if (lyrics.length === 0)
+                return;
+            const time = this.currentTime;
             let newIndex = -1;
-            for (let i = 0; i < this.lyrics.length; i++) {
-                if (currentTime >= this.lyrics[i].time) {
+            for (let i = 0; i < lyrics.length; i++) {
+                if (time >= lyrics[i].time) {
                     newIndex = i;
                 }
                 else {
                     break;
                 }
             }
-            if (newIndex !== this.currentLyricIndex) {
-                this.currentLyricIndex = newIndex;
-                this.emit('lyricchange', this.getCurrentLyric());
+            if (newIndex !== this.lyricIndex) {
+                this.lyricIndex = newIndex;
+                this.emit('lyricchange', this.lyric);
             }
         }
-        /**
-         * 获取当前歌词
-         */
-        getCurrentLyric() {
-            if (this.currentLyricIndex >= 0 && this.currentLyricIndex < this.lyrics.length) {
-                return this.lyrics[this.currentLyricIndex];
-            }
-            return null;
+        // ==================== Getters & Setters ====================
+        get volume() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.volume) !== null && _b !== void 0 ? _b : this.defaultVolume;
         }
-        /**
-         * 获取所有歌词
-         */
-        getAllLyrics() {
-            return [...this.lyrics];
-        }
-        /**
-         * 获取元数据
-         */
-        getMetadata() {
-            return Object.assign({}, this.metadata);
-        }
-        /**
-         * 更新元数据
-         */
-        updateMetadata(metadata) {
-            this.metadata = Object.assign(Object.assign({}, this.metadata), metadata);
-            // 如果更新了歌词，重新解析
-            if (metadata.lrc) {
-                this.parseLyrics(metadata.lrc);
+        set volume(value) {
+            const vol = Math.max(0, Math.min(1, value));
+            this.defaultVolume = vol;
+            if (this.audio) {
+                this.audio.volume = vol;
+                this.emit('volumechange', vol);
             }
         }
-        /**
-         * 获取播放状态
-         */
+        get currentTime() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.currentTime) !== null && _b !== void 0 ? _b : 0;
+        }
+        set currentTime(value) {
+            if (this.audio) {
+                this.audio.currentTime = value;
+            }
+        }
+        get duration() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.duration) !== null && _b !== void 0 ? _b : 0;
+        }
+        get paused() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.paused) !== null && _b !== void 0 ? _b : true;
+        }
+        get loop() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.loop) !== null && _b !== void 0 ? _b : this.defaultLoop;
+        }
+        set loop(value) {
+            this.defaultLoop = value;
+            if (this.audio) {
+                this.audio.loop = value;
+            }
+        }
+        get rate() {
+            var _a, _b;
+            return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.playbackRate) !== null && _b !== void 0 ? _b : this.defaultRate;
+        }
+        set rate(value) {
+            this.defaultRate = value;
+            if (this.audio) {
+                this.audio.playbackRate = value;
+            }
+        }
         get state() {
             return this._state;
         }
-        /**
-         * 获取播放进度（0-1）
-         */
         get progress() {
             if (this.duration === 0)
                 return 0;
             return this.currentTime / this.duration;
         }
-        /**
-         * 设置播放进度（0-1）
-         */
         set progress(value) {
             this.currentTime = value * this.duration;
         }
+        get current() {
+            if (this.index >= 0 && this.index < this.playlist.length) {
+                return this.playlist[this.index];
+            }
+            return null;
+        }
+        get(idx) {
+            if (idx >= 0 && idx < this.playlist.length) {
+                return this.playlist[idx];
+            }
+            return null;
+        }
+        getAll() {
+            return [...this.playlist];
+        }
+        get length() {
+            return this.playlist.length;
+        }
+        get currentIndex() {
+            return this.index;
+        }
+        set currentIndex(value) {
+            if (value >= 0 && value < this.playlist.length) {
+                this.index = value;
+            }
+        }
+        get playMode() {
+            return this.mode;
+        }
+        set playMode(value) {
+            this.mode = value;
+            if (value === exports.PlayMode.SHUFFLE) {
+                this.updateShuffle();
+            }
+        }
+        get lyric() {
+            const music = this.current;
+            if (!music)
+                return null;
+            const lyrics = music.getLyrics();
+            if (this.lyricIndex >= 0 && this.lyricIndex < lyrics.length) {
+                return lyrics[this.lyricIndex];
+            }
+            return null;
+        }
+        getLyrics() {
+            const music = this.current;
+            return music ? music.getLyrics() : [];
+        }
+        // ==================== Events ====================
+        on(event, listener) {
+            if (!this.eventListeners.has(event)) {
+                this.eventListeners.set(event, new Set());
+            }
+            this.eventListeners.get(event).add(listener);
+        }
+        off(event, listener) {
+            const listeners = this.eventListeners.get(event);
+            if (listeners) {
+                listeners.delete(listener);
+            }
+        }
+        emit(event, data) {
+            const listeners = this.eventListeners.get(event);
+            if (listeners) {
+                listeners.forEach(listener => listener(data));
+            }
+        }
+        destroy() {
+            this.stop();
+            if (this.audio) {
+                this.audio.src = '';
+                this.audio.load();
+                this.audio = null;
+            }
+            this.eventListeners.clear();
+            this.playlist = [];
+            this.index = -1;
+        }
     }
 
-    /**
-     * WebAudioKit - Main Entry Point
-     * 主入口文件
-     */
-    // 导出核心类
-
-    exports.AudioBGM = AudioBGM;
-    exports.AudioManager = AudioManager;
-    exports.BaseAudio = BaseAudio;
+    exports.BGM = BGM;
     exports.Music = Music;
-    exports.MusicPlaylist = MusicPlaylist;
-    exports.SoundEffect = SoundEffect;
-    exports.default = AudioManager;
-
-    Object.defineProperty(exports, '__esModule', { value: true });
+    exports.MusicPlayer = MusicPlayer;
+    exports.SFX = SFX;
 
 }));
 //# sourceMappingURL=index.global.js.map
