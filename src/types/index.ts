@@ -8,18 +8,36 @@
 export interface SFXOptions {
   volume?: number;
   rate?: number;
-  loop?: boolean;
+  stopOnHidden?: boolean;
+}
+
+/**
+ * 音效实例（单次播放的音频对象）
+ */
+export interface SFXInstance {
+  audio: HTMLAudioElement;
+  id: string;
+  stop(): void;
+}
+
+/**
+ * 淡入淡出配置
+ * fade: true 时使用默认时长 1000ms；也可直接用 fadeIn/fadeOut 指定毫秒数
+ */
+export interface FadeOptions {
+  fade?: boolean;
+  fadeIn?: number;
+  fadeOut?: number;
 }
 
 /**
  * BGM配置
  */
-export interface BGMOptions {
+export interface BGMOptions extends FadeOptions {
   volume?: number;
   rate?: number;
   loop?: boolean;
-  fadeIn?: number;
-  fadeOut?: number;
+  stopOnHidden?: boolean;
 }
 
 /**
@@ -37,11 +55,12 @@ export interface Metadata {
 /**
  * 音乐播放器配置
  */
-export interface MusicPlayerOptions {
+export interface MusicPlayerOptions extends FadeOptions {
   volume?: number;
   rate?: number;
   loop?: boolean;
   mode?: PlayMode;
+  stopOnHidden?: boolean;
 }
 
 /**

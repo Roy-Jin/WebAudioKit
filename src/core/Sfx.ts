@@ -3,102 +3,108 @@
  * 可重叠播放的音频效果
  */
 
-import type { SFXOptions, EventType, EventListener } from '../types';
+import type { SFXOptions, SFXInstance } from '../types';
 
 export class SFX {
-  private src: string | null = null;
-  private defaultVolume: number = 1;
-  private defaultRate: number = 1;
-  private eventListeners: Map<EventType, Set<EventListener>> = new Map();
-  private activeInstances: Set<HTMLAudioElement> = new Set();
-  private isLoaded: boolean = false;
-  private loadPromise: Promise<void> | null = null;
+  private Config: SFXOptions = {};
+  private ActiveInstances: Set<SFXInstance> = new Set();
+  private Cache: Map<string, string> = new Map(); // id -> src
+  private visibilityHandler: (() => void) | null = null;
+  private blocked: boolean = false;
 
   constructor(options: SFXOptions = {}) {
     if (options.volume !== undefined) {
-      this.defaultVolume = Math.max(0, Math.min(1, options.volume));
+      this.Config.volume = Math.max(0, Math.min(1, options.volume));
     }
     if (options.rate !== undefined) {
-      this.defaultRate = options.rate;
+      this.Config.rate = options.rate;
+    }
+    if (options.stopOnHidden !== undefined) {
+      this.Config.stopOnHidden = options.stopOnHidden;
+    }
+
+    if (this.Config.stopOnHidden) {
+      this.visibilityHandler = () => {
+        if (document.hidden) {
+          this.blocked = true;
+          this.stopAll();
+        } else {
+          this.blocked = false;
+        }
+      };
+      document.addEventListener('visibilitychange', this.visibilityHandler);
     }
   }
 
   /**
    * 预加载音效资源
    */
-  async load(src: string): Promise<void> {
-    if (this.src === src && this.isLoaded) {
-      return;
-    }
-
-    this.src = src;
-    this.isLoaded = false;
-
-    // 如果已有加载中的Promise，返回它
-    if (this.loadPromise) {
-      return this.loadPromise;
-    }
-
-    this.loadPromise = new Promise((resolve, reject) => {
+  async load(id: string, src: string): Promise<void> {
+    return new Promise((resolve, reject) => {
       const audio = new Audio(src);
-      
       const onLoad = () => {
-        this.isLoaded = true;
-        this.loadPromise = null;
-        this.emit('loaded');
+        this.Cache.set(id, src);
         cleanup();
         resolve();
       };
-
       const onError = (e: ErrorEvent) => {
-        this.loadPromise = null;
-        this.emit('error', e);
         cleanup();
         reject(e);
       };
-
       const cleanup = () => {
         audio.removeEventListener('canplaythrough', onLoad);
         audio.removeEventListener('error', onError);
       };
-
       audio.addEventListener('canplaythrough', onLoad, { once: true });
       audio.addEventListener('error', onError, { once: true });
       audio.load();
     });
-
-    return this.loadPromise;
   }
 
   /**
    * 播放音效（每次创建新实例，支持重叠播放）
    */
-  async play(): Promise<void> {
-    if (!this.src) {
-      throw new Error('SFX: No audio source loaded. Call load() first.');
+  async play(id: string, options: SFXOptions = {}): Promise<void> {
+    if (this.blocked) return;
+
+    const src = this.Cache.get(id);
+    if (!src) {
+      throw new Error(`SFX: "${id}" not loaded. Call load() first.`);
     }
 
-    const audio = new Audio(this.src);
-    audio.volume = this.defaultVolume;
-    audio.playbackRate = this.defaultRate;
+    const mergedOptions: SFXOptions = { ...this.Config, ...options };
+    const audio = new Audio(src);
 
-    this.activeInstances.add(audio);
+    if (mergedOptions.volume !== undefined) {
+      audio.volume = Math.max(0, Math.min(1, mergedOptions.volume));
+    }
+    if (mergedOptions.rate !== undefined) {
+      audio.playbackRate = mergedOptions.rate;
+    }
 
-    audio.addEventListener('play', () => this.emit('play'));
+    const instance: SFXInstance = {
+      audio,
+      id,
+      stop() {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    };
+
+    this.ActiveInstances.add(instance);
+
     audio.addEventListener('ended', () => {
-      this.emit('ended');
-      this.activeInstances.delete(audio);
-    });
-    audio.addEventListener('error', (e) => {
-      this.emit('error', e);
-      this.activeInstances.delete(audio);
-    });
+      this.ActiveInstances.delete(instance);
+    }, { once: true });
+
+    audio.addEventListener('error', () => {
+      this.ActiveInstances.delete(instance);
+    }, { once: true });
 
     try {
       await audio.play();
     } catch (error) {
-      this.emit('error', error);
-      this.activeInstances.delete(audio);
+      this.ActiveInstances.delete(instance);
       throw error;
     }
   }
@@ -107,71 +113,36 @@ export class SFX {
    * 停止所有正在播放的音效实例
    */
   stopAll(): void {
-    this.activeInstances.forEach(audio => {
-      audio.pause();
-      audio.currentTime = 0;
-    });
-    this.activeInstances.clear();
-    this.emit('stop');
+    this.ActiveInstances.forEach(instance => instance.stop());
+    this.ActiveInstances.clear();
   }
 
-  get volume(): number {
-    return this.defaultVolume;
-  }
-
-  set volume(value: number) {
-    this.defaultVolume = Math.max(0, Math.min(1, value));
-    this.activeInstances.forEach(audio => {
-      audio.volume = this.defaultVolume;
-    });
-    this.emit('volumechange', this.defaultVolume);
-  }
-
-  get rate(): number {
-    return this.defaultRate;
-  }
-
-  set rate(value: number) {
-    this.defaultRate = value;
-    this.activeInstances.forEach(audio => {
-      audio.playbackRate = this.defaultRate;
+  /**
+   * 停止指定 id 的所有音效实例
+   */
+  stop(id: string): void {
+    this.ActiveInstances.forEach(instance => {
+      if (instance.id === id) {
+        instance.stop();
+        this.ActiveInstances.delete(instance);
+      }
     });
   }
 
+  /**
+   * 获取当前活跃实例数量
+   */
   get activeCount(): number {
-    return this.activeInstances.size;
-  }
-
-  get loaded(): boolean {
-    return this.isLoaded;
-  }
-
-  on(event: EventType, listener: EventListener): void {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, new Set());
-    }
-    this.eventListeners.get(event)!.add(listener);
-  }
-
-  off(event: EventType, listener: EventListener): void {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      listeners.delete(listener);
-    }
-  }
-
-  private emit(event: EventType, data?: any): void {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      listeners.forEach(listener => listener(data));
-    }
+    return this.ActiveInstances.size;
   }
 
   destroy(): void {
     this.stopAll();
-    this.eventListeners.clear();
-    this.src = null;
-    this.isLoaded = false;
-    this.loadPromise = null;
+    this.ActiveInstances.clear();
+    this.Cache.clear();
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
   }
 }

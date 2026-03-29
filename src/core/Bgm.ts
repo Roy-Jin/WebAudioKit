@@ -1,99 +1,171 @@
 /**
  * BGM - 背景音乐类
- * 支持淡入淡出效果，不支持重叠播放
+ * 支持多曲预加载、按 id 播放、淡入淡出、页面隐藏暂停/恢复
  */
 
 import type { BGMOptions, EventType, EventListener } from '../types';
 
+const DEFAULT_FADE_MS = 1000;
+
+function resolveFadeMs(fade?: boolean, explicit?: number): number {
+  if (explicit !== undefined && explicit > 0) return explicit;
+  if (fade) return DEFAULT_FADE_MS;
+  return 0;
+}
+
 export class BGM {
+  private Config: BGMOptions = { loop: true, volume: 1, rate: 1, fadeIn: 0, fadeOut: 0 };
+  private Cache: Map<string, string> = new Map();
   private audio: HTMLAudioElement | null = null;
-  private src: string | null = null;
-  private eventListeners: Map<EventType, Set<EventListener>> = new Map();
-  private fadeInMs: number = 0;
-  private fadeOutMs: number = 0;
+  private currentId: string | null = null;
   private fadeTimer: number | null = null;
-  private defaultVolume: number = 1;
-  private defaultRate: number = 1;
-  private defaultLoop: boolean = true;
-  private isLoaded: boolean = false;
-  private loadPromise: Promise<void> | null = null;
+  private blocked: boolean = false;
+  private pausedByHidden: boolean = false;
+  private visibilityHandler: (() => void) | null = null;
+  private eventListeners: Map<EventType, Set<EventListener>> = new Map();
 
   constructor(options: BGMOptions = {}) {
-    if (options.volume !== undefined) {
-      this.defaultVolume = Math.max(0, Math.min(1, options.volume));
-    }
-    if (options.rate !== undefined) {
-      this.defaultRate = options.rate;
-    }
-    if (options.loop !== undefined) {
-      this.defaultLoop = options.loop;
-    }
-    if (options.fadeIn !== undefined) {
-      this.fadeInMs = options.fadeIn;
-    }
-    if (options.fadeOut !== undefined) {
-      this.fadeOutMs = options.fadeOut;
+    if (options.volume !== undefined) this.Config.volume = Math.max(0, Math.min(1, options.volume));
+    if (options.rate !== undefined) this.Config.rate = options.rate;
+    if (options.loop !== undefined) this.Config.loop = options.loop;
+    if (options.stopOnHidden !== undefined) this.Config.stopOnHidden = options.stopOnHidden;
+    this.Config.fadeIn  = resolveFadeMs(options.fade, options.fadeIn);
+    this.Config.fadeOut = resolveFadeMs(options.fade, options.fadeOut);
+
+    if (this.Config.stopOnHidden) {
+      this.visibilityHandler = () => {
+        if (document.hidden) {
+          this.blocked = true;
+          if (this.audio && !this.audio.paused) {
+            this.clearFade();
+            this.audio.pause();
+            this.pausedByHidden = true;
+          }
+        } else {
+          this.blocked = false;
+          if (this.pausedByHidden && this.audio) {
+            this.pausedByHidden = false;
+            this.resumePlay();
+          }
+        }
+      };
+      document.addEventListener('visibilitychange', this.visibilityHandler);
     }
   }
 
-  /**
-   * 预加载BGM资源
-   */
-  async load(src: string): Promise<void> {
-    if (this.src === src && this.isLoaded) {
-      return;
-    }
-
-    // 如果正在播放，先停止
-    if (this.audio && !this.audio.paused) {
-      this.stop();
-    }
-
-    this.src = src;
-    this.isLoaded = false;
-
-    if (this.loadPromise) {
-      return this.loadPromise;
-    }
-
-    this.loadPromise = new Promise((resolve, reject) => {
-      this.audio = new Audio(src);
-      this.audio.volume = this.defaultVolume;
-      this.audio.playbackRate = this.defaultRate;
-      this.audio.loop = this.defaultLoop;
-      this.setupEvents();
-
-      const onLoad = () => {
-        this.isLoaded = true;
-        this.loadPromise = null;
-        this.emit('loaded');
-        cleanup();
-        resolve();
-      };
-
-      const onError = (e: ErrorEvent) => {
-        this.loadPromise = null;
-        this.emit('error', e);
-        cleanup();
-        reject(e);
-      };
-
-      const cleanup = () => {
-        this.audio!.removeEventListener('canplaythrough', onLoad);
-        this.audio!.removeEventListener('error', onError);
-      };
-
-      this.audio.addEventListener('canplaythrough', onLoad, { once: true });
-      this.audio.addEventListener('error', onError, { once: true });
-      this.audio.load();
+  async load(id: string, src: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const audio = new Audio(src);
+      const onLoad = () => { this.Cache.set(id, src); resolve(); };
+      const onError = (e: ErrorEvent) => reject(e);
+      audio.addEventListener('canplaythrough', onLoad, { once: true });
+      audio.addEventListener('error', onError, { once: true });
+      audio.load();
     });
-
-    return this.loadPromise;
   }
 
-  private setupEvents(): void {
+  async play(id: string): Promise<void> {
+    if (this.blocked) return;
+
+    const src = this.Cache.get(id);
+    if (!src) throw new Error(`BGM: "${id}" not loaded. Call load() first.`);
+
+    if (this.currentId === id && this.audio && !this.audio.paused) return;
+
+    if (this.audio && !this.audio.paused) {
+      await this.fadeOut();
+      this.stopCurrent();
+    } else if (this.audio) {
+      this.stopCurrent();
+    }
+
+    this.audio = new Audio(src);
+    this.audio.volume = this.Config.volume!;
+    this.audio.playbackRate = this.Config.rate!;
+    this.audio.loop = this.Config.loop!;
+    this.currentId = id;
+    this.setupAudioEvents();
+    this.pausedByHidden = false;
+
+    await this.fadeIn();
+  }
+
+  pause(): void {
     if (!this.audio) return;
-    
+    this.clearFade();
+    this.audio.pause();
+  }
+
+  async resume(): Promise<void> {
+    if (this.blocked || !this.audio || !this.audio.paused) return;
+    await this.resumePlay();
+  }
+
+  stop(): void {
+    this.clearFade();
+    this.stopCurrent();
+    this.pausedByHidden = false;
+  }
+
+  get volume(): number { return this.audio?.volume ?? this.Config.volume!; }
+  set volume(value: number) {
+    const vol = Math.max(0, Math.min(1, value));
+    this.Config.volume = vol;
+    if (this.audio) { this.audio.volume = vol; this.emit('volumechange', vol); }
+  }
+
+  get rate(): number { return this.audio?.playbackRate ?? this.Config.rate!; }
+  set rate(value: number) {
+    this.Config.rate = value;
+    if (this.audio) this.audio.playbackRate = value;
+  }
+
+  get loop(): boolean { return this.audio?.loop ?? this.Config.loop!; }
+  set loop(value: boolean) {
+    this.Config.loop = value;
+    if (this.audio) this.audio.loop = value;
+  }
+
+  get currentTime(): number { return this.audio?.currentTime ?? 0; }
+  set currentTime(value: number) { if (this.audio) this.audio.currentTime = value; }
+
+  get duration(): number { return this.audio?.duration ?? 0; }
+  get paused(): boolean { return this.audio?.paused ?? true; }
+  get playing(): string | null { return this.currentId; }
+
+  on(event: EventType, listener: EventListener): void {
+    if (!this.eventListeners.has(event)) this.eventListeners.set(event, new Set());
+    this.eventListeners.get(event)!.add(listener);
+  }
+
+  off(event: EventType, listener: EventListener): void {
+    this.eventListeners.get(event)?.delete(listener);
+  }
+
+  destroy(): void {
+    this.clearFade();
+    this.stopCurrent();
+    this.Cache.clear();
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+    this.eventListeners.clear();
+  }
+
+  private stopCurrent(): void {
+    if (!this.audio) return;
+    this.audio.pause();
+    this.audio.currentTime = 0;
+    this.audio.src = '';
+    this.audio.load();
+    this.audio = null;
+    this.currentId = null;
+    this.emit('stop');
+  }
+
+  private setupAudioEvents(): void {
+    if (!this.audio) return;
     this.audio.addEventListener('play', () => this.emit('play'));
     this.audio.addEventListener('pause', () => this.emit('pause'));
     this.audio.addEventListener('ended', () => this.emit('ended'));
@@ -104,220 +176,57 @@ export class BGM {
     this.audio.addEventListener('error', (e) => this.emit('error', e));
   }
 
-  async play(): Promise<void> {
-    if (!this.audio) {
-      throw new Error('BGM: No audio source loaded. Call load() first.');
-    }
-
-    if (this.fadeInMs > 0) {
-      await this.fadeIn();
-    } else {
-      try {
-        await this.audio.play();
-      } catch (error) {
-        this.emit('error', error);
-        throw error;
-      }
-    }
-  }
-
-  pause(): void {
-    if (!this.audio) return;
-    this.audio.pause();
-  }
-
-  stop(): void {
-    if (!this.audio) return;
-
-    if (this.fadeOutMs > 0) {
-      this.fadeOut().then(() => {
-        if (this.audio) {
-          this.audio.pause();
-          this.audio.currentTime = 0;
-          this.emit('stop');
-        }
-      });
-    } else {
-      this.audio.pause();
-      this.audio.currentTime = 0;
-      this.emit('stop');
-    }
-  }
-
-  get volume(): number {
-    return this.audio?.volume ?? this.defaultVolume;
-  }
-
-  set volume(value: number) {
-    const vol = Math.max(0, Math.min(1, value));
-    this.defaultVolume = vol;
-    if (this.audio) {
-      this.audio.volume = vol;
-      this.emit('volumechange', vol);
-    }
-  }
-
-  get currentTime(): number {
-    return this.audio?.currentTime ?? 0;
-  }
-
-  set currentTime(value: number) {
-    if (this.audio) {
-      this.audio.currentTime = value;
-    }
-  }
-
-  get duration(): number {
-    return this.audio?.duration ?? 0;
-  }
-
-  get paused(): boolean {
-    return this.audio?.paused ?? true;
-  }
-
-  get loop(): boolean {
-    return this.audio?.loop ?? this.defaultLoop;
-  }
-
-  set loop(value: boolean) {
-    this.defaultLoop = value;
-    if (this.audio) {
-      this.audio.loop = value;
-    }
-  }
-
-  get rate(): number {
-    return this.audio?.playbackRate ?? this.defaultRate;
-  }
-
-  set rate(value: number) {
-    this.defaultRate = value;
-    if (this.audio) {
-      this.audio.playbackRate = value;
-    }
-  }
-
-  get loaded(): boolean {
-    return this.isLoaded;
-  }
-
-  on(event: EventType, listener: EventListener): void {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, new Set());
-    }
-    this.eventListeners.get(event)!.add(listener);
-  }
-
-  off(event: EventType, listener: EventListener): void {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      listeners.delete(listener);
-    }
-  }
-
-  private emit(event: EventType, data?: any): void {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      listeners.forEach(listener => listener(data));
-    }
+  private async resumePlay(): Promise<void> {
+    if (!this.audio || this.blocked) return;
+    try {
+      if (this.Config.fadeIn! > 0) await this.fadeIn();
+      else await this.audio.play();
+    } catch (error) { this.emit('error', error); }
   }
 
   private async fadeIn(): Promise<void> {
     if (!this.audio) return;
-
     this.clearFade();
-    const targetVolume = this.audio.volume;
-    this.audio.volume = 0;
-    
-    try {
-      await this.audio.play();
-    } catch (error) {
-      this.emit('error', error);
-      throw error;
+    if (this.Config.fadeIn! <= 0) {
+      try { await this.audio.play(); } catch (e) { this.emit('error', e); throw e; }
+      return;
     }
-    
+    const target = this.Config.volume!;
+    this.audio.volume = 0;
+    try { await this.audio.play(); } catch (e) { this.emit('error', e); throw e; }
     return new Promise((resolve) => {
-      const step = targetVolume / (this.fadeInMs / 50);
+      const step = target / (this.Config.fadeIn! / 50);
       let vol = 0;
-      
       this.fadeTimer = window.setInterval(() => {
-        if (!this.audio) {
-          this.clearFade();
-          resolve();
-          return;
-        }
-
+        if (!this.audio) { this.clearFade(); resolve(); return; }
         vol += step;
-        if (vol >= targetVolume) {
-          this.audio.volume = targetVolume;
-          this.clearFade();
-          resolve();
-        } else {
-          this.audio.volume = vol;
-        }
+        if (vol >= target) { this.audio.volume = target; this.clearFade(); resolve(); }
+        else this.audio.volume = vol;
       }, 50);
     });
   }
 
   private async fadeOut(): Promise<void> {
-    if (!this.audio) return;
-
+    if (!this.audio || this.Config.fadeOut! <= 0) return;
     this.clearFade();
-    const startVolume = this.audio.volume;
-    
+    const start = this.audio.volume;
     return new Promise((resolve) => {
-      const step = startVolume / (this.fadeOutMs / 50);
-      let vol = startVolume;
-      
+      const step = start / (this.Config.fadeOut! / 50);
+      let vol = start;
       this.fadeTimer = window.setInterval(() => {
-        if (!this.audio) {
-          this.clearFade();
-          resolve();
-          return;
-        }
-
+        if (!this.audio) { this.clearFade(); resolve(); return; }
         vol -= step;
-        if (vol <= 0) {
-          this.audio.volume = 0;
-          this.clearFade();
-          resolve();
-        } else {
-          this.audio.volume = vol;
-        }
+        if (vol <= 0) { this.audio.volume = 0; this.clearFade(); resolve(); }
+        else this.audio.volume = vol;
       }, 50);
     });
   }
 
   private clearFade(): void {
-    if (this.fadeTimer !== null) {
-      clearInterval(this.fadeTimer);
-      this.fadeTimer = null;
-    }
+    if (this.fadeTimer !== null) { clearInterval(this.fadeTimer); this.fadeTimer = null; }
   }
 
-  /**
-   * 切换到新的BGM源
-   */
-  async switch(src: string): Promise<void> {
-    if (this.fadeOutMs > 0 && this.audio && !this.audio.paused) {
-      await this.fadeOut();
-    }
-    this.stop();
-    await this.load(src);
-    await this.play();
-  }
-
-  destroy(): void {
-    this.clearFade();
-    this.stop();
-    if (this.audio) {
-      this.audio.src = '';
-      this.audio.load();
-      this.audio = null;
-    }
-    this.eventListeners.clear();
-    this.src = null;
-    this.isLoaded = false;
-    this.loadPromise = null;
+  private emit(event: EventType, data?: any): void {
+    this.eventListeners.get(event)?.forEach(listener => listener(data));
   }
 }

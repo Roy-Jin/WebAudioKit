@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MusicPlayer Test</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f0f13;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+      gap: 20px;
+    }
+
+    h1 { font-size: 1.3rem; font-weight: 600; color: #fff; letter-spacing: 0.05em; }
+
+    /* 加载遮罩 */
+    .loading-overlay {
+      position: fixed; inset: 0;
+      background: #0f0f13;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      z-index: 100; font-size: 0.88rem; color: #888;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #2a2a36; border-top-color: #6366f1;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 播放器主卡片 */
+    .player-card {
+      width: 100%; max-width: 560px;
+      background: #1a1a22; border: 1px solid #2a2a36;
+      border-radius: 16px; overflow: hidden;
+    }
+
+    /* 封面区 */
+    .cover-wrap {
+      position: relative;
+      width: 100%; aspect-ratio: 1;
+      background: #111118;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cover-wrap img {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: opacity 0.4s;
+    }
+    .cover-wrap img.hidden { opacity: 0; }
+
+    /* 状态徽章 */
+    .state-badge {
+      position: absolute; top: 12px; right: 12px;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 0.75rem; color: #ccc;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #555;
+      transition: background 0.2s;
+    }
+    .dot.playing  { background: #4ade80; box-shadow: 0 0 5px #4ade80; }
+    .dot.paused   { background: #facc15; }
+    .dot.loading  { background: #60a5fa; animation: pulse 1s infinite; }
+    .dot.stopped  { background: #555; }
+    .dot.error    { background: #ef4444; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* 信息区 */
+    .info-wrap {
+      padding: 20px 24px 0;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .track-title {
+      font-size: 1.05rem; font-weight: 600; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .track-artist {
+      font-size: 0.82rem; color: #888;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* 歌词 */
+    .lyric-line {
+      min-height: 22px; padding: 8px 24px 0;
+      font-size: 0.82rem; color: #6366f1;
+      text-align: center; font-style: italic;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: opacity 0.3s;
+    }
+
+    /* 进度条 */
+    .progress-wrap {
+      padding: 12px 24px 0;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.72rem; color: #666;
+    }
+    .progress-track {
+      flex: 1; height: 4px; background: #2a2a36;
+      border-radius: 2px; cursor: pointer; position: relative;
+    }
+    .progress-fill {
+      height: 100%; background: #6366f1; border-radius: 2px;
+      width: 0%; pointer-events: none;
+      transition: width 0.25s linear;
+    }
+
+    /* 音量 */
+    .volume-row {
+      padding: 10px 24px 0;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.78rem; color: #666;
+    }
+    input[type=range] { flex: 1; accent-color: #6366f1; cursor: pointer; }
+    .vol-label { min-width: 36px; text-align: right; color: #aaa; }
+
+    /* 控制按钮 */
+    .controls {
+      padding: 16px 24px 20px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    .btn {
+      background: #22222e; border: 1px solid #2a2a36;
+      color: #ccc; border-radius: 8px; cursor: pointer;
+      font-size: 0.82rem; padding: 9px 18px;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn:hover  { background: #2e2e3e; color: #fff; border-color: #444; }
+    .btn:active { background: #6366f1; color: #fff; border-color: #6366f1; }
+    .btn.icon   { padding: 9px 14px; font-size: 1rem; }
+    .btn.primary { background: #6366f1; color: #fff; border-color: #6366f1; }
+    .btn.primary:hover { background: #4f52d4; }
+
+    /* 播放模式 */
+    .mode-row {
+      padding: 0 24px 16px;
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .mode-btn {
+      padding: 5px 12px; border-radius: 20px;
+      border: 1px solid #2a2a36; background: #22222e;
+      color: #888; font-size: 0.75rem; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mode-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+    /* 播放列表 */
+    .playlist-card {
+      width: 100%; max-width: 560px;
+      background: #1a1a22; border: 1px solid #2a2a36;
+      border-radius: 12px; overflow: hidden;
+    }
+    .playlist-header {
+      padding: 14px 20px;
+      font-size: 0.8rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; color: #666;
+      border-bottom: 1px solid #2a2a36;
+    }
+    .playlist-body { max-height: 320px; overflow-y: auto; }
+    .playlist-body::-webkit-scrollbar { width: 4px; }
+    .playlist-body::-webkit-scrollbar-track { background: transparent; }
+    .playlist-body::-webkit-scrollbar-thumb { background: #2a2a36; border-radius: 2px; }
+
+    .playlist-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 20px; cursor: pointer;
+      transition: background 0.12s; border-bottom: 1px solid #1e1e28;
+    }
+    .playlist-item:last-child { border-bottom: none; }
+    .playlist-item:hover { background: #22222e; }
+    .playlist-item.active { background: #1e1e30; }
+
+    .item-index {
+      min-width: 24px; text-align: center;
+      font-size: 0.75rem; color: #555;
+    }
+    .playlist-item.active .item-index { color: #6366f1; }
+
+    .item-info { flex: 1; overflow: hidden; }
+    .item-title {
+      font-size: 0.85rem; color: #ddd;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .playlist-item.active .item-title { color: #6366f1; }
+    .item-artist { font-size: 0.75rem; color: #666; }
+
+    .item-dur { font-size: 0.72rem; color: #555; }
+  </style>
+</head>
+<body>
+
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <span id="loading-text">正在获取播放列表...</span>
+  </div>
+
+  <h1>MusicPlayer Test</h1>
+
+  <!-- 播放器主卡片 -->
+  <div class="player-card">
+    <div class="cover-wrap">
+      <img id="cover" src="" alt="cover" class="hidden" />
+      <div class="state-badge">
+        <div class="dot stopped" id="state-dot"></div>
+        <span id="state-text">未播放</span>
+      </div>
+    </div>
+
+    <div class="info-wrap">
+      <div class="track-title" id="track-title">—</div>
+      <div class="track-artist" id="track-artist">—</div>
+    </div>
+
+    <div class="lyric-line" id="lyric-line"></div>
+
+    <div class="progress-wrap">
+      <span id="cur-time">0:00</span>
+      <div class="progress-track" id="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+    </div>
+
+    <div class="volume-row">
+      <span>🔈</span>
+      <input type="range" min="0" max="100" value="80" id="vol-slider" />
+      <span class="vol-label" id="vol-label">80%</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn icon" id="btn-prev" title="上一首">⏮</button>
+      <button class="btn icon primary" id="btn-play" title="播放/暂停">▶</button>
+      <button class="btn icon" id="btn-next" title="下一首">⏭</button>
+      <button class="btn icon" id="btn-stop" title="停止">⏹</button>
+    </div>
+
+    <div class="mode-row">
+      <button class="mode-btn" data-mode="sequential">顺序</button>
+      <button class="mode-btn" data-mode="loop">列表循环</button>
+      <button class="mode-btn" data-mode="single">单曲循环</button>
+      <button class="mode-btn active" data-mode="shuffle">随机</button>
+    </div>
+  </div>
+
+  <!-- 播放列表 -->
+  <div class="playlist-card">
+    <div class="playlist-header">播放列表 · <span id="playlist-count">0</span> 首</div>
+    <div class="playlist-body" id="playlist-body"></div>
+  </div>
+
+  <script type="module">
+    import { MusicPlayer, PlayMode } from '../dist/index.js';
+
+    const METING_API = 'https://api.i-meto.com/meting/api';
+
+    // ── 工具 ──────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+    const fmt = s => {
+      if (!s || isNaN(s) || !isFinite(s)) return '0:00';
+      const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+      return `${m}:${sec.toString().padStart(2, '0')}`;
+    };
+
+    // ── 初始化播放器 ──────────────────────────────────────
+    const player = new MusicPlayer({
+      volume: 0.8,
+      fade: true,
+      stopOnHidden: false,
+      mode: PlayMode.SHUFFLE
+    });
+
+    // ── 获取播放列表 ──────────────────────────────────────
+    $('loading-text').textContent = '正在获取播放列表...';
+    let metingData;
+    try {
+      const res = await fetch(`${METING_API}?server=netease&type=playlist&id=7697114803`);
+      metingData = await res.json();
+    } catch (e) {
+      $('loading-text').textContent = '获取失败，请检查网络';
+      throw e;
+    }
+
+    player.addFromMeting(metingData);
+    $('loading').style.display = 'none';
+
+    // ── 渲染播放列表 ──────────────────────────────────────
+    function renderPlaylist() {
+      const all = player.getAll();
+      $('playlist-count').textContent = all.length;
+      const body = $('playlist-body');
+      body.innerHTML = '';
+      all.forEach((music, i) => {
+        const meta = music.meta;
+        const item = document.createElement('div');
+        item.className = 'playlist-item' + (i === player.currentIndex ? ' active' : '');
+        item.dataset.idx = i;
+        item.innerHTML = `
+          <div class="item-index">${i + 1}</div>
+          <div class="item-info">
+            <div class="item-title">${meta.title ?? '未知曲目'}</div>
+            <div class="item-artist">${meta.artist ?? '未知艺术家'}</div>
+          </div>
+          <div class="item-dur">${fmt(meta.duration)}</div>
+        `;
+        item.addEventListener('click', () => player.play(i));
+        body.appendChild(item);
+      });
+    }
+
+    function updateActiveItem() {
+      document.querySelectorAll('.playlist-item').forEach((el, i) => {
+        el.classList.toggle('active', i === player.currentIndex);
+      });
+      // 滚动到当前项
+      const active = $('playlist-body').querySelector('.playlist-item.active');
+      active?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    renderPlaylist();
+
+    // ── 状态更新 ──────────────────────────────────────────
+    function setStateDot(state) {
+      $('state-dot').className = `dot ${state}`;
+      const labels = { playing: '播放中', paused: '已暂停', stopped: '未播放', loading: '加载中', error: '错误' };
+      $('state-text').textContent = labels[state] ?? state;
+      $('btn-play').textContent = state === 'playing' ? '⏸' : '▶';
+    }
+
+    function updateMeta(music) {
+      if (!music) return;
+      const meta = music.meta;
+      $('track-title').textContent  = meta.title  ?? '未知曲目';
+      $('track-artist').textContent = meta.artist ?? '未知艺术家';
+
+      const img = $('cover');
+      if (meta.cover) {
+        img.classList.add('hidden');
+        img.onload = () => img.classList.remove('hidden');
+        img.src = meta.cover;
+      }
+    }
+
+    // ── 事件监听 ──────────────────────────────────────────
+    player.on('play',    () => setStateDot('playing'));
+    player.on('pause',   () => setStateDot('paused'));
+    player.on('stop',    () => { setStateDot('stopped'); $('lyric-line').textContent = ''; });
+    player.on('ended',   () => setStateDot('stopped'));
+
+    player.on('musicchange', music => {
+      setStateDot('loading');
+      updateMeta(music);
+      updateActiveItem();
+      $('lyric-line').textContent = '';
+      $('progress-fill').style.width = '0%';
+      $('cur-time').textContent = '0:00';
+    });
+
+    player.on('timeupdate', ({ currentTime, duration }) => {
+      $('cur-time').textContent = fmt(currentTime);
+      $('progress-fill').style.width = duration > 0 ? `${(currentTime / duration) * 100}%` : '0%';
+    });
+
+    player.on('lyricchange', lyric => {
+      $('lyric-line').textContent = lyric?.text ?? '';
+    });
+
+    player.on('volumechange', v => {
+      const pct = Math.round(v * 100);
+      $('vol-slider').value = pct;
+      $('vol-label').textContent = `${pct}%`;
+    });
+
+    player.on('error', e => {
+      // setStateDot('error');
+      console.error('Player error:', e);
+    });
+
+    // ── 控制按钮 ──────────────────────────────────────────
+    $('btn-play').addEventListener('click', () => {
+      if (player.state === 'playing') player.pause();
+      else player.play();
+    });
+
+    $('btn-prev').addEventListener('click', () => player.playPrev());
+    $('btn-next').addEventListener('click', () => player.playNext());
+    $('btn-stop').addEventListener('click', () => player.stop());
+
+    // ── 进度条点击 ────────────────────────────────────────
+    $('progress-track').addEventListener('click', e => {
+      if (!player.duration) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      player.currentTime = ((e.clientX - rect.left) / rect.width) * player.duration;
+    });
+
+    // ── 音量滑块 ──────────────────────────────────────────
+    $('vol-slider').addEventListener('input', e => {
+      player.volume = e.target.value / 100;
+      $('vol-label').textContent = `${e.target.value}%`;
+    });
+
+    // ── 播放模式 ──────────────────────────────────────────
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        player.playMode = btn.dataset.mode;
+      });
+    });
+  </script>
+</body>
+</html>
