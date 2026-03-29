@@ -1,7 +1,7 @@
 {
   "name": "webaudiokit",
   "version": "0.0.1",
-  "description": "webaudiokit",
+  "description": "WebAudioKit is a JavaScript library for creating and manipulating audio signals using the WebAudio API.",
   "license": "MIT",
   "author": "Roy-Jin",
   "type": "module",
@@ -27,6 +27,9 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --run --coverage"
   },
+    "dependencies": {
+    "lrc-kit": "^1.2.1"
+  },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-typescript": "^11.1.5",
@@ -35,6 +38,15 @@
     "tslib": "^2.6.2",
     "typescript": "^5.2.2"
   },
+  "keywords": [
+    "audio",
+    "sound",
+    "music",
+    "player",
+    "webaudio",
+    "playlist",
+    "lyrics"
+  ],
   "files": [
     "dist",
     "LICENSE",
@@ -48,8 +60,5 @@
   "bugs": {
     "url": "https://github.com/Roy-Jin/WebAudioKit/issues"
   },
-  "homepage": "https://WebAudioKit.pages.dev",
-  "dependencies": {
-    "lrc-kit": "^1.2.1"
-  }
+  "homepage": "https://WebAudioKit.pages.dev"
 }
