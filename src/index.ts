@@ -9,7 +9,6 @@ export { BaseAudio } from './core/BaseAudio';
 export { SoundEffect } from './core/SoundEffect';
 export { AudioBGM } from './core/AudioBGM';
 export { Music } from './core/Music';
-export { MusicPlaylist } from './core/MusicPlaylist';
 
 // 导出类型定义
 export type {

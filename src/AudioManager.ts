@@ -6,13 +6,11 @@
 import { SoundEffect } from './core/SoundEffect';
 import { AudioBGM } from './core/AudioBGM';
 import { Music } from './core/Music';
-import { MusicPlaylist } from './core/MusicPlaylist';
 import type { 
   AudioManagerConfig, 
   SoundEffectOptions, 
   AudioOptions, 
-  MusicOptions,
-  PlayMode 
+  MusicOptions
 } from './types';
 
 export class AudioManager {
@@ -24,40 +22,40 @@ export class AudioManager {
     muted: false
   };
 
-  private soundEffects: Set<SoundEffect> = new Set();
-  private currentBGM: AudioBGM | null = null;
-  private musicPlaylist: MusicPlaylist | null = null;
-  private visibilityChangeHandler: (() => void) | null = null;
+  private sounds: Set<SoundEffect> = new Set();
+  private bgm: AudioBGM | null = null;
+  private music: Music | null = null;
+  private visibilityHandler: (() => void) | null = null;
 
   private constructor(config: AudioManagerConfig = {}) {
-    this.updateConfig(config);
-    this.setupVisibilityHandler();
+    this.setConfig(config);
+    this.setupVisibility();
   }
 
   /**
    * 获取单例实例
    */
-  static getInstance(config?: AudioManagerConfig): AudioManager {
+  static get(config?: AudioManagerConfig): AudioManager {
     if (!AudioManager.instance) {
       AudioManager.instance = new AudioManager(config);
     }
     return AudioManager.instance;
   }
 
+  // ==================== 配置管理 ====================
+
   /**
    * 更新配置
    */
-  updateConfig(config: Partial<AudioManagerConfig>): void {
+  setConfig(config: Partial<AudioManagerConfig>): void {
     this.config = { ...this.config, ...config };
     
-    // 应用全局音量
     if (config.volume !== undefined) {
-      this.applyGlobalVolume();
+      this.applyVolume();
     }
 
-    // 应用静音状态
     if (config.muted !== undefined) {
-      this.applyMutedState();
+      this.applyMute();
     }
   }
 
@@ -71,9 +69,9 @@ export class AudioManager {
   /**
    * 设置全局音量
    */
-  setVolume(volume: number): void {
-    this.config.volume = Math.max(0, Math.min(1, volume));
-    this.applyGlobalVolume();
+  setVolume(vol: number): void {
+    this.config.volume = Math.max(0, Math.min(1, vol));
+    this.applyVolume();
   }
 
   /**
@@ -86,9 +84,9 @@ export class AudioManager {
   /**
    * 设置静音
    */
-  setMuted(muted: boolean): void {
+  setMute(muted: boolean): void {
     this.config.muted = muted;
-    this.applyMutedState();
+    this.applyMute();
   }
 
   /**
@@ -101,63 +99,35 @@ export class AudioManager {
   /**
    * 应用全局音量
    */
-  private applyGlobalVolume(): void {
-    // 应用到所有音效
-    this.soundEffects.forEach(sound => {
-      sound.volume = this.config.volume;
-    });
-
-    // 应用到BGM
-    if (this.currentBGM) {
-      this.currentBGM.volume = this.config.volume;
-    }
-
-    // 应用到音乐播放列表
-    if (this.musicPlaylist) {
-      const currentMusic = this.musicPlaylist.getCurrentMusic();
-      if (currentMusic) {
-        currentMusic.volume = this.config.volume;
-      }
-    }
+  private applyVolume(): void {
+    this.sounds.forEach(s => s.volume = this.config.volume);
+    if (this.bgm) this.bgm.volume = this.config.volume;
+    if (this.music) this.music.volume = this.config.volume;
   }
 
   /**
    * 应用静音状态
    */
-  private applyMutedState(): void {
-    const volume = this.config.muted ? 0 : this.config.volume;
-
-    this.soundEffects.forEach(sound => {
-      sound.volume = volume;
-    });
-
-    if (this.currentBGM) {
-      this.currentBGM.volume = volume;
-    }
-
-    if (this.musicPlaylist) {
-      const currentMusic = this.musicPlaylist.getCurrentMusic();
-      if (currentMusic) {
-        currentMusic.volume = volume;
-      }
-    }
+  private applyMute(): void {
+    const vol = this.config.muted ? 0 : this.config.volume;
+    this.sounds.forEach(s => s.volume = vol);
+    if (this.bgm) this.bgm.volume = vol;
+    if (this.music) this.music.volume = vol;
   }
+
+  // ==================== 音效管理 ====================
 
   /**
    * 创建音效
    */
-  createSoundEffect(src: string, options: SoundEffectOptions = {}): SoundEffect {
+  createSound(src: string, options: SoundEffectOptions = {}): SoundEffect {
     const sound = new SoundEffect(src, {
       ...options,
       volume: options.volume ?? this.config.volume
     });
 
-    this.soundEffects.add(sound);
-
-    // 音效结束后从集合中移除
-    sound.on('ended', () => {
-      this.soundEffects.delete(sound);
-    });
+    this.sounds.add(sound);
+    sound.on('ended', () => this.sounds.delete(sound));
 
     return sound;
   }
@@ -165,8 +135,8 @@ export class AudioManager {
   /**
    * 播放音效（快捷方法）
    */
-  async playSoundEffect(src: string, options: SoundEffectOptions = {}): Promise<SoundEffect> {
-    const sound = this.createSoundEffect(src, options);
+  async playSound(src: string, options: SoundEffectOptions = {}): Promise<SoundEffect> {
+    const sound = this.createSound(src, options);
     await sound.play();
     return sound;
   }
@@ -174,35 +144,35 @@ export class AudioManager {
   /**
    * 停止所有音效
    */
-  stopAllSoundEffects(): void {
-    this.soundEffects.forEach(sound => sound.stop());
-    this.soundEffects.clear();
+  stopSounds(): void {
+    this.sounds.forEach(s => s.stop());
+    this.sounds.clear();
   }
+
+  // ==================== BGM管理 ====================
 
   /**
    * 创建BGM
    */
   createBGM(src: string, options: AudioOptions = {}): AudioBGM {
-    const bgm = new AudioBGM(src, {
+    return new AudioBGM(src, {
       ...options,
       volume: options.volume ?? this.config.volume
     });
-    return bgm;
   }
 
   /**
    * 播放BGM
    */
   async playBGM(src: string, options: AudioOptions = {}): Promise<AudioBGM> {
-    // 停止当前BGM
-    if (this.currentBGM) {
-      this.currentBGM.stop();
+    if (this.bgm) {
+      this.bgm.stop();
     }
 
-    const bgm = this.createBGM(src, options);
-    this.currentBGM = bgm;
-    await bgm.play();
-    return bgm;
+    const newBGM = this.createBGM(src, options);
+    this.bgm = newBGM;
+    await newBGM.play();
+    return newBGM;
   }
 
   /**
@@ -211,13 +181,13 @@ export class AudioManager {
   async switchBGM(src: string, options: AudioOptions = {}): Promise<AudioBGM> {
     const newBGM = this.createBGM(src, options);
     
-    if (this.currentBGM) {
-      await this.currentBGM.switchTo(newBGM);
+    if (this.bgm) {
+      await this.bgm.switchTo(newBGM);
     } else {
       await newBGM.play();
     }
 
-    this.currentBGM = newBGM;
+    this.bgm = newBGM;
     return newBGM;
   }
 
@@ -225,168 +195,156 @@ export class AudioManager {
    * 停止BGM
    */
   stopBGM(): void {
-    if (this.currentBGM) {
-      this.currentBGM.stop();
-      this.currentBGM = null;
+    if (this.bgm) {
+      this.bgm.stop();
+      this.bgm = null;
     }
   }
 
   /**
    * 获取当前BGM
    */
-  getCurrentBGM(): AudioBGM | null {
-    return this.currentBGM;
+  getBGM(): AudioBGM | null {
+    return this.bgm;
+  }
+
+  // ==================== 音乐管理 ====================
+
+  /**
+   * 创建音乐播放器
+   */
+  createMusic(src: string, options: MusicOptions = {}): Music {
+    return new Music(src, {
+      ...options,
+      volume: options.volume ?? this.config.volume
+    });
   }
 
   /**
-   * 创建音乐播放列表
+   * 设置音乐播放器
    */
-  createMusicPlaylist(musics: Music[] = []): MusicPlaylist {
-    this.musicPlaylist = new MusicPlaylist(musics);
-    return this.musicPlaylist;
+  setMusic(music: Music): void {
+    if (this.music) {
+      this.music.stop();
+    }
+    this.music = music;
   }
 
   /**
-   * 获取音乐播放列表
+   * 获取音乐播放器
    */
-  getMusicPlaylist(): MusicPlaylist | null {
-    return this.musicPlaylist;
+  getMusic(): Music | null {
+    return this.music;
   }
 
   /**
-   * 播放音乐播放列表中的当前音乐
+   * 播放当前音乐
    */
-  async playCurrentMusic(): Promise<void> {
-    if (!this.musicPlaylist) return;
-
-    const music = this.musicPlaylist.getCurrentMusic();
-    if (music) {
-      music.volume = this.config.muted ? 0 : this.config.volume;
-      await music.play();
+  async playMusic(): Promise<void> {
+    if (this.music) {
+      this.music.volume = this.config.muted ? 0 : this.config.volume;
+      await this.music.play();
     }
   }
 
   /**
-   * 播放下一首音乐
+   * 停止音乐
    */
-  async playNextMusic(): Promise<void> {
-    if (!this.musicPlaylist) return;
-
-    const currentMusic = this.musicPlaylist.getCurrentMusic();
-    if (currentMusic) {
-      currentMusic.stop();
-    }
-
-    const nextMusic = this.musicPlaylist.next();
-    if (nextMusic) {
-      nextMusic.volume = this.config.muted ? 0 : this.config.volume;
-      await nextMusic.play();
+  stopMusic(): void {
+    if (this.music) {
+      this.music.stop();
     }
   }
 
-  /**
-   * 播放上一首音乐
-   */
-  async playPreviousMusic(): Promise<void> {
-    if (!this.musicPlaylist) return;
-
-    const currentMusic = this.musicPlaylist.getCurrentMusic();
-    if (currentMusic) {
-      currentMusic.stop();
-    }
-
-    const prevMusic = this.musicPlaylist.previous();
-    if (prevMusic) {
-      prevMusic.volume = this.config.muted ? 0 : this.config.volume;
-      await prevMusic.play();
-    }
-  }
-
-  /**
-   * 设置音乐播放模式
-   */
-  setMusicPlayMode(mode: PlayMode): void {
-    if (this.musicPlaylist) {
-      this.musicPlaylist.playMode = mode;
-    }
-  }
+  // ==================== 页面可见性处理 ====================
 
   /**
    * 设置页面可见性处理
    */
-  private setupVisibilityHandler(): void {
-    this.visibilityChangeHandler = () => {
+  private setupVisibility(): void {
+    this.visibilityHandler = () => {
       if (!this.config.pauseOnHidden) return;
 
       if (document.hidden) {
-        // 页面隐藏时暂停所有音频
-        this.soundEffects.forEach(sound => {
-          if (!sound.paused) {
-            sound.pause();
-            (sound as any)._wasPlayingBeforeHidden = true;
+        // 页面隐藏时暂停并静音所有音频
+        this.sounds.forEach(s => {
+          if (!s.paused) {
+            s.pause();
+            (s as any)._wasPlaying = true;
           }
+          (s as any)._vol = s.volume;
+          s.volume = 0;
         });
 
-        if (this.currentBGM && !this.currentBGM.paused) {
-          this.currentBGM.pause();
-          (this.currentBGM as any)._wasPlayingBeforeHidden = true;
+        if (this.bgm) {
+          if (!this.bgm.paused) {
+            this.bgm.pause();
+            (this.bgm as any)._wasPlaying = true;
+          }
+          (this.bgm as any)._vol = this.bgm.volume;
+          this.bgm.volume = 0;
         }
 
-        if (this.musicPlaylist) {
-          const music = this.musicPlaylist.getCurrentMusic();
-          if (music && !music.paused) {
-            music.pause();
-            (music as any)._wasPlayingBeforeHidden = true;
+        if (this.music) {
+          if (!this.music.paused) {
+            this.music.pause();
+            (this.music as any)._wasPlaying = true;
           }
+          (this.music as any)._vol = this.music.volume;
+          this.music.volume = 0;
         }
       } else {
-        // 页面显示时恢复播放
-        this.soundEffects.forEach(sound => {
-          if ((sound as any)._wasPlayingBeforeHidden) {
-            sound.play();
-            delete (sound as any)._wasPlayingBeforeHidden;
+        // 页面显示时恢复播放和音量
+        this.sounds.forEach(s => {
+          if ((s as any)._vol !== undefined) {
+            s.volume = (s as any)._vol;
+            delete (s as any)._vol;
+          }
+          if ((s as any)._wasPlaying) {
+            s.play();
+            delete (s as any)._wasPlaying;
           }
         });
 
-        if (this.currentBGM && (this.currentBGM as any)._wasPlayingBeforeHidden) {
-          this.currentBGM.play();
-          delete (this.currentBGM as any)._wasPlayingBeforeHidden;
+        if (this.bgm) {
+          if ((this.bgm as any)._vol !== undefined) {
+            this.bgm.volume = (this.bgm as any)._vol;
+            delete (this.bgm as any)._vol;
+          }
+          if ((this.bgm as any)._wasPlaying) {
+            this.bgm.play();
+            delete (this.bgm as any)._wasPlaying;
+          }
         }
 
-        if (this.musicPlaylist) {
-          const music = this.musicPlaylist.getCurrentMusic();
-          if (music && (music as any)._wasPlayingBeforeHidden) {
-            music.play();
-            delete (music as any)._wasPlayingBeforeHidden;
+        if (this.music) {
+          if ((this.music as any)._vol !== undefined) {
+            this.music.volume = (this.music as any)._vol;
+            delete (this.music as any)._vol;
+          }
+          if ((this.music as any)._wasPlaying) {
+            this.music.play();
+            delete (this.music as any)._wasPlaying;
           }
         }
       }
     };
 
-    document.addEventListener('visibilitychange', this.visibilityChangeHandler);
+    document.addEventListener('visibilitychange', this.visibilityHandler);
   }
+
+  // ==================== 销毁 ====================
 
   /**
    * 销毁管理器
    */
   destroy(): void {
-    // 停止所有音效
-    this.stopAllSoundEffects();
-
-    // 停止BGM
+    this.stopSounds();
     this.stopBGM();
+    this.stopMusic();
 
-    // 停止音乐
-    if (this.musicPlaylist) {
-      const music = this.musicPlaylist.getCurrentMusic();
-      if (music) {
-        music.stop();
-      }
-    }
-
-    // 移除事件监听
-    if (this.visibilityChangeHandler) {
-      document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
     }
 
     AudioManager.instance = null;

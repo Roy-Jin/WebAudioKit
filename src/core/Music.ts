@@ -1,18 +1,24 @@
 /**
- * Music - 音乐类
- * 具有完整元数据、歌词解析、播放列表等功能的音乐播放器
+ * Music - 音乐播放器类
+ * 支持单曲播放、播放列表、歌词解析等功能
  */
 
 import { BaseAudio } from './BaseAudio';
 import type { MusicOptions, MusicMetadata, LyricLine, MetingData } from '../types';
-import { PlayState } from '../types';
+import { PlayState, PlayMode } from '../types';
 import { Lrc } from 'lrc-kit';
 
 export class Music extends BaseAudio {
   private metadata: MusicMetadata;
   private lyrics: LyricLine[] = [];
-  private currentLyricIndex: number = -1;
+  private lyricIndex: number = -1;
   private _state: PlayState = PlayState.STOPPED;
+  
+  // 播放列表相关
+  private playlist: Music[] = [];
+  private index: number = -1;
+  private mode: PlayMode = PlayMode.SEQUENTIAL;
+  private shuffleOrder: number[] = [];
 
   constructor(src: string, options: MusicOptions = {}) {
     super(src);
@@ -35,8 +41,8 @@ export class Music extends BaseAudio {
       this.parseLyrics(this.metadata.lrc);
     }
 
-    // 监听时间更新以同步歌词
-    this.on('timeupdate', () => this.updateCurrentLyric());
+    // 监听事件
+    this.on('timeupdate', () => this.updateLyric());
     this.on('play', () => this._state = PlayState.PLAYING);
     this.on('pause', () => this._state = PlayState.PAUSED);
     this.on('stop', () => this._state = PlayState.STOPPED);
@@ -46,29 +52,39 @@ export class Music extends BaseAudio {
   /**
    * 从Meting API数据创建音乐实例
    */
-  static async fromMetingData(data: MetingData, options: MusicOptions = {}): Promise<Music> {
-    const metadata: MusicMetadata = {
-      title: data.name,
-      artist: data.artist,
-      album: data.album,
-      cover: data.pic
-    };
+  static async fromMeting(data: MetingData[], options: MusicOptions = {}): Promise<Music[]> {
+    const musicList: Music[] = [];
 
-    // 如果有歌词URL，获取歌词
-    if (data.lrc) {
-      try {
-        const response = await fetch(data.lrc);
-        metadata.lrc = await response.text();
-      } catch (error) {
-        console.warn('Failed to fetch lyrics:', error);
+    for (const item of data) {
+      const metadata: MusicMetadata = {
+        title: item.name ?? item.title,
+        artist: item.artist ?? item.author,
+        album: item.album ?? "",
+        cover: item.pic ?? item.cover,
+      };
+
+      // 获取歌词
+      if (item.lrc || item.lyric) {
+        try {
+          const response = await fetch(item.lrc ?? item.lyric);
+          metadata.lrc = await response.text();
+        } catch (error) {
+          console.warn('Failed to fetch lyrics:', error);
+        }
       }
+
+      const music = new Music(item.url, {
+        ...options,
+        metadata
+      });
+
+      musicList.push(music);
     }
 
-    return new Music(data.url, {
-      ...options,
-      metadata
-    });
+    return musicList;
   }
+
+  // ==================== 歌词相关 ====================
 
   /**
    * 解析LRC歌词
@@ -77,7 +93,7 @@ export class Music extends BaseAudio {
     try {
       const lrc = Lrc.parse(lrcText);
       this.lyrics = lrc.lyrics.map(line => ({
-        time: line.timestamp / 1000, // 转换为秒
+        time: line.timestamp,
         text: line.content
       }));
     } catch (error) {
@@ -89,32 +105,32 @@ export class Music extends BaseAudio {
   /**
    * 更新当前歌词
    */
-  private updateCurrentLyric(): void {
+  private updateLyric(): void {
     if (this.lyrics.length === 0) return;
 
-    const currentTime = this.currentTime;
+    const time = this.currentTime;
     let newIndex = -1;
 
     for (let i = 0; i < this.lyrics.length; i++) {
-      if (currentTime >= this.lyrics[i].time) {
+      if (time >= this.lyrics[i].time) {
         newIndex = i;
       } else {
         break;
       }
     }
 
-    if (newIndex !== this.currentLyricIndex) {
-      this.currentLyricIndex = newIndex;
-      this.emit('lyricchange', this.getCurrentLyric());
+    if (newIndex !== this.lyricIndex) {
+      this.lyricIndex = newIndex;
+      this.emit('lyricchange', this.getLyric());
     }
   }
 
   /**
    * 获取当前歌词
    */
-  getCurrentLyric(): LyricLine | null {
-    if (this.currentLyricIndex >= 0 && this.currentLyricIndex < this.lyrics.length) {
-      return this.lyrics[this.currentLyricIndex];
+  getLyric(): LyricLine | null {
+    if (this.lyricIndex >= 0 && this.lyricIndex < this.lyrics.length) {
+      return this.lyrics[this.lyricIndex];
     }
     return null;
   }
@@ -122,21 +138,23 @@ export class Music extends BaseAudio {
   /**
    * 获取所有歌词
    */
-  getAllLyrics(): LyricLine[] {
+  getLyrics(): LyricLine[] {
     return [...this.lyrics];
   }
+
+  // ==================== 元数据相关 ====================
 
   /**
    * 获取元数据
    */
-  getMetadata(): MusicMetadata {
+  getMeta(): MusicMetadata {
     return { ...this.metadata };
   }
 
   /**
    * 更新元数据
    */
-  updateMetadata(metadata: Partial<MusicMetadata>): void {
+  setMeta(metadata: Partial<MusicMetadata>): void {
     this.metadata = { ...this.metadata, ...metadata };
     
     // 如果更新了歌词，重新解析
@@ -144,6 +162,8 @@ export class Music extends BaseAudio {
       this.parseLyrics(metadata.lrc);
     }
   }
+
+  // ==================== 播放状态相关 ====================
 
   /**
    * 获取播放状态
@@ -165,5 +185,197 @@ export class Music extends BaseAudio {
    */
   set progress(value: number) {
     this.currentTime = value * this.duration;
+  }
+
+  // ==================== 播放列表相关 ====================
+
+  /**
+   * 添加到播放列表
+   */
+  add(music: Music): void {
+    this.playlist.push(music);
+    if (this.index === -1) {
+      this.index = 0;
+    }
+    this.updateShuffle();
+  }
+
+  /**
+   * 批量添加到播放列表
+   */
+  addList(musicList: Music[]): void {
+    this.playlist.push(...musicList);
+    if (this.index === -1 && this.playlist.length > 0) {
+      this.index = 0;
+    }
+    this.updateShuffle();
+  }
+
+  /**
+   * 从Meting API数据添加到播放列表
+   */
+  async addFromMeting(data: MetingData[], options: MusicOptions = {}): Promise<void> {
+    const musicList = await Music.fromMeting(data, options);
+    this.addList(musicList);
+  }
+
+  /**
+   * 从播放列表移除
+   */
+  remove(idx: number): void {
+    if (idx >= 0 && idx < this.playlist.length) {
+      this.playlist.splice(idx, 1);
+      if (this.index >= this.playlist.length) {
+        this.index = this.playlist.length - 1;
+      }
+      this.updateShuffle();
+    }
+  }
+
+  /**
+   * 清空播放列表
+   */
+  clear(): void {
+    this.playlist = [];
+    this.index = -1;
+    this.shuffleOrder = [];
+  }
+
+  /**
+   * 获取当前音乐
+   */
+  getCurrent(): Music | null {
+    if (this.index >= 0 && this.index < this.playlist.length) {
+      return this.playlist[this.index];
+    }
+    return null;
+  }
+
+  /**
+   * 获取指定音乐
+   */
+  get(idx: number): Music | null {
+    if (idx >= 0 && idx < this.playlist.length) {
+      return this.playlist[idx];
+    }
+    return null;
+  }
+
+  /**
+   * 获取所有音乐
+   */
+  getAll(): Music[] {
+    return [...this.playlist];
+  }
+
+  /**
+   * 获取列表长度
+   */
+  get length(): number {
+    return this.playlist.length;
+  }
+
+  /**
+   * 获取/设置当前索引
+   */
+  get currentIndex(): number {
+    return this.index;
+  }
+
+  set currentIndex(value: number) {
+    if (value >= 0 && value < this.playlist.length) {
+      this.index = value;
+    }
+  }
+
+  /**
+   * 获取/设置播放模式
+   */
+  get playMode(): PlayMode {
+    return this.mode;
+  }
+
+  set playMode(value: PlayMode) {
+    this.mode = value;
+    if (value === PlayMode.SHUFFLE) {
+      this.updateShuffle();
+    }
+  }
+
+  /**
+   * 下一首
+   */
+  next(): Music | null {
+    if (this.playlist.length === 0) return null;
+
+    switch (this.mode) {
+      case PlayMode.SINGLE:
+        return this.getCurrent();
+
+      case PlayMode.SHUFFLE:
+        const currIdx = this.shuffleOrder.indexOf(this.index);
+        const nextIdx = (currIdx + 1) % this.shuffleOrder.length;
+        this.index = this.shuffleOrder[nextIdx];
+        break;
+
+      case PlayMode.LOOP:
+        this.index = (this.index + 1) % this.playlist.length;
+        break;
+
+      case PlayMode.SEQUENTIAL:
+        if (this.index < this.playlist.length - 1) {
+          this.index++;
+        } else {
+          return null;
+        }
+        break;
+    }
+
+    return this.getCurrent();
+  }
+
+  /**
+   * 上一首
+   */
+  prev(): Music | null {
+    if (this.playlist.length === 0) return null;
+
+    switch (this.mode) {
+      case PlayMode.SINGLE:
+        return this.getCurrent();
+
+      case PlayMode.SHUFFLE:
+        const currIdx = this.shuffleOrder.indexOf(this.index);
+        const prevIdx = currIdx === 0 ? this.shuffleOrder.length - 1 : currIdx - 1;
+        this.index = this.shuffleOrder[prevIdx];
+        break;
+
+      case PlayMode.LOOP:
+        this.index = this.index === 0 ? this.playlist.length - 1 : this.index - 1;
+        break;
+
+      case PlayMode.SEQUENTIAL:
+        if (this.index > 0) {
+          this.index--;
+        } else {
+          return null;
+        }
+        break;
+    }
+
+    return this.getCurrent();
+  }
+
+  /**
+   * 更新随机播放顺序
+   */
+  private updateShuffle(): void {
+    this.shuffleOrder = Array.from({ length: this.playlist.length }, (_, i) => i);
+    // Fisher-Yates 洗牌
+    for (let i = this.shuffleOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.shuffleOrder[i], this.shuffleOrder[j]] = 
+        [this.shuffleOrder[j], this.shuffleOrder[i]];
+    }
   }
 }
