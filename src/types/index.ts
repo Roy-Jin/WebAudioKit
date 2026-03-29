@@ -9,6 +9,7 @@ export interface SFXOptions {
   volume?: number;
   rate?: number;
   stopOnHidden?: boolean;
+  preload?: boolean;
 }
 
 /**
@@ -38,6 +39,7 @@ export interface BGMOptions extends FadeOptions {
   rate?: number;
   loop?: boolean;
   stopOnHidden?: boolean;
+  preload?: boolean;
 }
 
 /**
@@ -61,6 +63,7 @@ export interface MusicPlayerOptions extends FadeOptions {
   loop?: boolean;
   mode?: PlayMode;
   stopOnHidden?: boolean;
+  preload?: boolean;
 }
 
 /**

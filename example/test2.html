@@ -277,6 +277,7 @@
       stopOnHidden: false,
       mode: PlayMode.SHUFFLE
     });
+    window.player = player;
 
     // ── 获取播放列表 ──────────────────────────────────────
     $('loading-text').textContent = '正在获取播放列表...';
@@ -328,18 +329,23 @@
     renderPlaylist();
 
     // ── 状态更新 ──────────────────────────────────────────
+    const syncPlayBtn = () => { $('btn-play').textContent = player.paused ? '▶' : '⏸'; };
+
     function setStateDot(state) {
       $('state-dot').className = `dot ${state}`;
       const labels = { playing: '播放中', paused: '已暂停', stopped: '未播放', loading: '加载中', error: '错误' };
       $('state-text').textContent = labels[state] ?? state;
-      $('btn-play').textContent = state === 'playing' ? '⏸' : '▶';
+      syncPlayBtn();
     }
 
     function updateMeta(music) {
       if (!music) return;
       const meta = music.meta;
-      $('track-title').textContent  = meta.title  ?? '未知曲目';
-      $('track-artist').textContent = meta.artist ?? '未知艺术家';
+      const title  = meta.title  ?? '未知曲目';
+      const artist = meta.artist ?? '未知艺术家';
+      $('track-title').textContent  = title;
+      $('track-artist').textContent = artist;
+      document.title = `${title} - ${artist}`;
 
       const img = $('cover');
       if (meta.cover) {
@@ -352,7 +358,7 @@
     // ── 事件监听 ──────────────────────────────────────────
     player.on('play',    () => setStateDot('playing'));
     player.on('pause',   () => setStateDot('paused'));
-    player.on('stop',    () => { setStateDot('stopped'); $('lyric-line').textContent = ''; });
+    player.on('stop',    () => { setStateDot('stopped'); $('lyric-line').textContent = ''; document.title = 'MusicPlayer Test'; });
     player.on('ended',   () => setStateDot('stopped'));
 
     player.on('musicchange', music => {
@@ -381,13 +387,13 @@
 
     player.on('error', e => {
       // setStateDot('error');
-      console.error('Player error:', e);
+      // console.error('Player error:', e);
     });
 
     // ── 控制按钮 ──────────────────────────────────────────
     $('btn-play').addEventListener('click', () => {
-      if (player.state === 'playing') player.pause();
-      else player.play();
+      if (player.paused) player.play();
+      else player.pause();
     });
 
     $('btn-prev').addEventListener('click', () => player.playPrev());

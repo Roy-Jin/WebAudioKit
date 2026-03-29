@@ -14,7 +14,7 @@ function resolveFadeMs(fade?: boolean, explicit?: number): number {
 }
 
 export class BGM {
-  private Config: BGMOptions = { loop: true, volume: 1, rate: 1, fadeIn: 0, fadeOut: 0 };
+  private Config: BGMOptions = { loop: true, volume: 1, rate: 1, fadeIn: 0, fadeOut: 0, preload: false };
   private Cache: Map<string, string> = new Map();
   private audio: HTMLAudioElement | null = null;
   private currentId: string | null = null;
@@ -29,6 +29,7 @@ export class BGM {
     if (options.rate !== undefined) this.Config.rate = options.rate;
     if (options.loop !== undefined) this.Config.loop = options.loop;
     if (options.stopOnHidden !== undefined) this.Config.stopOnHidden = options.stopOnHidden;
+    if (options.preload !== undefined) this.Config.preload = options.preload;
     this.Config.fadeIn  = resolveFadeMs(options.fade, options.fadeIn);
     this.Config.fadeOut = resolveFadeMs(options.fade, options.fadeOut);
 
@@ -54,6 +55,11 @@ export class BGM {
   }
 
   async load(id: string, src: string): Promise<void> {
+    if (!this.Config.preload) {
+      // 非预加载模式：仅缓存 src
+      this.Cache.set(id, src);
+      return;
+    }
     return new Promise((resolve, reject) => {
       const audio = new Audio(src);
       const onLoad = () => { this.Cache.set(id, src); resolve(); };
@@ -68,7 +74,7 @@ export class BGM {
     if (this.blocked) return;
 
     const src = this.Cache.get(id);
-    if (!src) throw new Error(`BGM: "${id}" not loaded. Call load() first.`);
+    if (!src) throw new Error(`BGM: "${id}" not found. Call load() first.`);
 
     if (this.currentId === id && this.audio && !this.audio.paused) return;
 

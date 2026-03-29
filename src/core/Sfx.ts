@@ -6,7 +6,7 @@
 import type { SFXOptions, SFXInstance } from '../types';
 
 export class SFX {
-  private Config: SFXOptions = {};
+  private Config: SFXOptions = { preload: false };
   private ActiveInstances: Set<SFXInstance> = new Set();
   private Cache: Map<string, string> = new Map(); // id -> src
   private visibilityHandler: (() => void) | null = null;
@@ -21,6 +21,9 @@ export class SFX {
     }
     if (options.stopOnHidden !== undefined) {
       this.Config.stopOnHidden = options.stopOnHidden;
+    }
+    if (options.preload !== undefined) {
+      this.Config.preload = options.preload;
     }
 
     if (this.Config.stopOnHidden) {
@@ -37,9 +40,14 @@ export class SFX {
   }
 
   /**
-   * 预加载音效资源
+   * 预加载音效资源（preload: true 时建议提前调用；preload: false 时可跳过）
    */
   async load(id: string, src: string): Promise<void> {
+    if (!this.Config.preload) {
+      // 非预加载模式：仅缓存 src，不触发网络请求
+      this.Cache.set(id, src);
+      return;
+    }
     return new Promise((resolve, reject) => {
       const audio = new Audio(src);
       const onLoad = () => {
@@ -63,14 +71,17 @@ export class SFX {
 
   /**
    * 播放音效（每次创建新实例，支持重叠播放）
+   * preload: false 时可直接传 src 而无需提前调用 load()
    */
-  async play(id: string, options: SFXOptions = {}): Promise<void> {
+  async play(id: string, options: SFXOptions & { src?: string } = {}): Promise<void> {
     if (this.blocked) return;
 
-    const src = this.Cache.get(id);
+    const src = options.src ?? this.Cache.get(id);
     if (!src) {
-      throw new Error(`SFX: "${id}" not loaded. Call load() first.`);
+      throw new Error(`SFX: "${id}" not found. Call load() first or pass { src } directly.`);
     }
+    // 按需缓存
+    if (!this.Cache.has(id)) this.Cache.set(id, src);
 
     const mergedOptions: SFXOptions = { ...this.Config, ...options };
     const audio = new Audio(src);

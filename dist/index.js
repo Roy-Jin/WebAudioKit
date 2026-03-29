@@ -36,7 +36,7 @@ typeof SuppressedError === "function" ? SuppressedError : function (error, suppr
  */
 class SFX {
     constructor(options = {}) {
-        this.Config = {};
+        this.Config = { preload: false };
         this.ActiveInstances = new Set();
         this.Cache = new Map(); // id -> src
         this.visibilityHandler = null;
@@ -49,6 +49,9 @@ class SFX {
         }
         if (options.stopOnHidden !== undefined) {
             this.Config.stopOnHidden = options.stopOnHidden;
+        }
+        if (options.preload !== undefined) {
+            this.Config.preload = options.preload;
         }
         if (this.Config.stopOnHidden) {
             this.visibilityHandler = () => {
@@ -64,10 +67,15 @@ class SFX {
         }
     }
     /**
-     * 预加载音效资源
+     * 预加载音效资源（preload: true 时建议提前调用；preload: false 时可跳过）
      */
     load(id, src) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!this.Config.preload) {
+                // 非预加载模式：仅缓存 src，不触发网络请求
+                this.Cache.set(id, src);
+                return;
+            }
             return new Promise((resolve, reject) => {
                 const audio = new Audio(src);
                 const onLoad = () => {
@@ -91,15 +99,20 @@ class SFX {
     }
     /**
      * 播放音效（每次创建新实例，支持重叠播放）
+     * preload: false 时可直接传 src 而无需提前调用 load()
      */
     play(id_1) {
         return __awaiter(this, arguments, void 0, function* (id, options = {}) {
+            var _a;
             if (this.blocked)
                 return;
-            const src = this.Cache.get(id);
+            const src = (_a = options.src) !== null && _a !== void 0 ? _a : this.Cache.get(id);
             if (!src) {
-                throw new Error(`SFX: "${id}" not loaded. Call load() first.`);
+                throw new Error(`SFX: "${id}" not found. Call load() first or pass { src } directly.`);
             }
+            // 按需缓存
+            if (!this.Cache.has(id))
+                this.Cache.set(id, src);
             const mergedOptions = Object.assign(Object.assign({}, this.Config), options);
             const audio = new Audio(src);
             if (mergedOptions.volume !== undefined) {
@@ -181,7 +194,7 @@ function resolveFadeMs$1(fade, explicit) {
 }
 class BGM {
     constructor(options = {}) {
-        this.Config = { loop: true, volume: 1, rate: 1, fadeIn: 0, fadeOut: 0 };
+        this.Config = { loop: true, volume: 1, rate: 1, fadeIn: 0, fadeOut: 0, preload: false };
         this.Cache = new Map();
         this.audio = null;
         this.currentId = null;
@@ -198,6 +211,8 @@ class BGM {
             this.Config.loop = options.loop;
         if (options.stopOnHidden !== undefined)
             this.Config.stopOnHidden = options.stopOnHidden;
+        if (options.preload !== undefined)
+            this.Config.preload = options.preload;
         this.Config.fadeIn = resolveFadeMs$1(options.fade, options.fadeIn);
         this.Config.fadeOut = resolveFadeMs$1(options.fade, options.fadeOut);
         if (this.Config.stopOnHidden) {
@@ -223,6 +238,11 @@ class BGM {
     }
     load(id, src) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!this.Config.preload) {
+                // 非预加载模式：仅缓存 src
+                this.Cache.set(id, src);
+                return;
+            }
             return new Promise((resolve, reject) => {
                 const audio = new Audio(src);
                 const onLoad = () => { this.Cache.set(id, src); resolve(); };
@@ -239,7 +259,7 @@ class BGM {
                 return;
             const src = this.Cache.get(id);
             if (!src)
-                throw new Error(`BGM: "${id}" not loaded. Call load() first.`);
+                throw new Error(`BGM: "${id}" not found. Call load() first.`);
             if (this.currentId === id && this.audio && !this.audio.paused)
                 return;
             if (this.audio && !this.audio.paused) {
@@ -867,6 +887,9 @@ class MusicPlayer {
         this.fadeInMs = 0;
         this.fadeOutMs = 0;
         this.fadeTimer = null;
+        this.enablePreload = true;
+        this.preloadAudio = null;
+        this.preloadSrc = null;
         if (options.volume !== undefined)
             this.defaultVolume = Math.max(0, Math.min(1, options.volume));
         if (options.rate !== undefined)
@@ -877,6 +900,8 @@ class MusicPlayer {
             this.mode = options.mode;
         this.fadeInMs = resolveFadeMs(options.fade, options.fadeIn);
         this.fadeOutMs = resolveFadeMs(options.fade, options.fadeOut);
+        if (options.preload !== undefined)
+            this.enablePreload = options.preload;
         if (options.stopOnHidden) {
             this.visibilityHandler = () => {
                 if (document.hidden) {
@@ -1019,7 +1044,21 @@ class MusicPlayer {
                 this.audio.src = '';
                 this.audio = null;
             }
-            this.audio = new Audio(music.url);
+            // 复用预加载的 audio（如果 src 匹配）
+            if (this.preloadAudio && this.preloadSrc === music.url) {
+                this.audio = this.preloadAudio;
+                this.preloadAudio = null;
+                this.preloadSrc = null;
+            }
+            else {
+                // 丢弃不匹配的预加载
+                if (this.preloadAudio) {
+                    this.preloadAudio.src = '';
+                    this.preloadAudio = null;
+                    this.preloadSrc = null;
+                }
+                this.audio = new Audio(music.url);
+            }
             this.audio.volume = this.defaultVolume;
             this.audio.playbackRate = this.defaultRate;
             this.audio.loop = this.defaultLoop;
@@ -1040,6 +1079,9 @@ class MusicPlayer {
                     throw error;
                 }
             }
+            // 预加载下一首
+            if (this.enablePreload)
+                this.preloadNext();
         });
     }
     setupEvents() {
@@ -1077,6 +1119,38 @@ class MusicPlayer {
                 this.emit('stop');
             }
         });
+    }
+    /** 预加载下一首的音频、封面图片和歌词 */
+    preloadNext() {
+        const nextIdx = this.resolveNext();
+        if (nextIdx === null || nextIdx === this.index)
+            return;
+        const next = this.playlist[nextIdx];
+        if (!next)
+            return;
+        // 避免重复预加载同一首
+        if (this.preloadSrc === next.url)
+            return;
+        // 清理旧的预加载
+        if (this.preloadAudio) {
+            this.preloadAudio.src = '';
+            this.preloadAudio = null;
+        }
+        // 预加载音频
+        this.preloadSrc = next.url;
+        this.preloadAudio = new Audio();
+        this.preloadAudio.preload = 'auto';
+        this.preloadAudio.src = next.url;
+        this.preloadAudio.volume = 0;
+        this.preloadAudio.load();
+        // 预加载封面
+        const cover = next.meta.cover;
+        if (cover) {
+            const img = new Image();
+            img.src = cover;
+        }
+        // 预加载歌词
+        next.loadLyrics().catch(() => { });
     }
     // ==================== 播放顺序计算（无副作用） ====================
     /**
@@ -1220,6 +1294,11 @@ class MusicPlayer {
             this.audio.src = '';
             this.audio.load();
             this.audio = null;
+        }
+        if (this.preloadAudio) {
+            this.preloadAudio.src = '';
+            this.preloadAudio = null;
+            this.preloadSrc = null;
         }
         if (this.visibilityHandler) {
             document.removeEventListener('visibilitychange', this.visibilityHandler);

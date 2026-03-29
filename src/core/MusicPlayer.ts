@@ -36,6 +36,9 @@ export class MusicPlayer {
   private fadeInMs: number = 0;
   private fadeOutMs: number = 0;
   private fadeTimer: number | null = null;
+  private enablePreload: boolean = true;
+  private preloadAudio: HTMLAudioElement | null = null;
+  private preloadSrc: string | null = null;
 
   constructor(options: MusicPlayerOptions = {}) {
     if (options.volume !== undefined) this.defaultVolume = Math.max(0, Math.min(1, options.volume));
@@ -44,6 +47,7 @@ export class MusicPlayer {
     if (options.mode !== undefined) this.mode = options.mode;
     this.fadeInMs  = resolveFadeMs(options.fade, options.fadeIn);
     this.fadeOutMs = resolveFadeMs(options.fade, options.fadeOut);
+    if (options.preload !== undefined) this.enablePreload = options.preload;
 
     if (options.stopOnHidden) {
       this.visibilityHandler = () => {
@@ -184,7 +188,20 @@ export class MusicPlayer {
       this.audio = null;
     }
 
-    this.audio = new Audio(music.url);
+    // 复用预加载的 audio（如果 src 匹配）
+    if (this.preloadAudio && this.preloadSrc === music.url) {
+      this.audio = this.preloadAudio;
+      this.preloadAudio = null;
+      this.preloadSrc = null;
+    } else {
+      // 丢弃不匹配的预加载
+      if (this.preloadAudio) {
+        this.preloadAudio.src = '';
+        this.preloadAudio = null;
+        this.preloadSrc = null;
+      }
+      this.audio = new Audio(music.url);
+    }
     this.audio.volume = this.defaultVolume;
     this.audio.playbackRate = this.defaultRate;
     this.audio.loop = this.defaultLoop;
@@ -206,6 +223,9 @@ export class MusicPlayer {
         throw error;
       }
     }
+
+    // 预加载下一首
+    if (this.enablePreload) this.preloadNext();
   }
 
   private setupEvents(): void {
@@ -240,6 +260,42 @@ export class MusicPlayer {
       this._state = PlayState.STOPPED;
       this.emit('stop');
     }
+  }
+
+  /** 预加载下一首的音频、封面图片和歌词 */
+  private preloadNext(): void {
+    const nextIdx = this.resolveNext();
+    if (nextIdx === null || nextIdx === this.index) return;
+
+    const next = this.playlist[nextIdx];
+    if (!next) return;
+
+    // 避免重复预加载同一首
+    if (this.preloadSrc === next.url) return;
+
+    // 清理旧的预加载
+    if (this.preloadAudio) {
+      this.preloadAudio.src = '';
+      this.preloadAudio = null;
+    }
+
+    // 预加载音频
+    this.preloadSrc = next.url;
+    this.preloadAudio = new Audio();
+    this.preloadAudio.preload = 'auto';
+    this.preloadAudio.src = next.url;
+    this.preloadAudio.volume = 0;
+    this.preloadAudio.load();
+
+    // 预加载封面
+    const cover = next.meta.cover;
+    if (cover) {
+      const img = new Image();
+      img.src = cover;
+    }
+
+    // 预加载歌词
+    next.loadLyrics().catch(() => {});
   }
 
   // ==================== 播放顺序计算（无副作用） ====================
@@ -398,6 +454,7 @@ export class MusicPlayer {
     this.clearFade();
     this.stop();
     if (this.audio) { this.audio.src = ''; this.audio.load(); this.audio = null; }
+    if (this.preloadAudio) { this.preloadAudio.src = ''; this.preloadAudio = null; this.preloadSrc = null; }
     if (this.visibilityHandler) {
       document.removeEventListener('visibilitychange', this.visibilityHandler);
       this.visibilityHandler = null;
