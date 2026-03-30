@@ -1,3 +1,5 @@
+<div align="center">
+
 # WebAudioKit
 
 [![npm version](https://img.shields.io/npm/v/webaudiokit.svg)](https://www.npmjs.com/package/webaudiokit)
@@ -6,9 +8,11 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/webaudiokit.svg)](https://bundlephobia.com/package/webaudiokit)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 
+一个功能强大、轻量级的 JavaScript 网页音频处理库，全面支持背景音乐、音效和高级音乐播放功能。
+
 [English](README.md) | [中文](README_zh.md)
 
-一个功能强大、轻量级的 JavaScript 网页音频处理库，全面支持背景音乐、音效和高级音乐播放功能。
+</div>
 
 ## ✨ 特性
 

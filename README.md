@@ -1,3 +1,5 @@
+<div align="center">
+
 # WebAudioKit
 
 [![npm version](https://img.shields.io/npm/v/webaudiokit.svg)](https://www.npmjs.com/package/webaudiokit)
@@ -6,9 +8,11 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/webaudiokit.svg)](https://bundlephobia.com/package/webaudiokit)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 
+A powerful, lightweight JavaScript library for web audio manipulation with comprehensive support for background music, sound effects, and advanced music playback features.
+
 [English](README.md) | [中文](README_zh.md)
 
-A powerful, lightweight JavaScript library for web audio manipulation with comprehensive support for background music, sound effects, and advanced music playback features.
+</div>
 
 ## ✨ Features
 

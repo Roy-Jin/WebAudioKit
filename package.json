@@ -1,7 +1,7 @@
 {
   "name": "webaudiokit",
   "version": "1.0.0",
-  "description": "WebAudioKit is a JavaScript library for creating and manipulating audio signals using the WebAudio API.",
+  "description": "A powerful, lightweight JavaScript library for web audio manipulation with comprehensive support for background music, sound effects, and advanced music playback features.",
   "license": "MIT",
   "author": "Roy-Jin",
   "type": "module",
@@ -57,6 +57,10 @@
     "USAGE.md",
     "USAGE_zh.md"
   ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "provenance": true
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Roy-Jin/WebAudioKit.git"
