@@ -1,6 +1,6 @@
 # 使用指南
 
-[![npm version](https://img.shields.io/npm/v/webaudiokit.svg)](https://www.npmjs.com/package/webaudiokit)
+[![npm version](https://img.shields.io/badge/npm-webaudiokit-blue.svg)](https://www.npmjs.com/package/webaudiokit)
 
 [English](USAGE.md) | [中文](USAGE_zh.md)
 
@@ -9,19 +9,20 @@ WebAudioKit 的全面使用指南和实用示例。
 ## 目录
 
 - [安装和设置](#安装和设置)
+- [快速开始](#快速开始)
+- [配置管理](#配置管理)
 - [BGM 示例](#bgm-示例)
 - [SFX 示例](#sfx-示例)
 - [音乐播放器示例](#音乐播放器示例)
 - [高级模式](#高级模式)
-- [集成示例](#集成示例)
-- [性能优化](#性能优化)
-- [故障排除](#故障排除)
+- [框架集成](#框架集成)
+- [最佳实践](#最佳实践)
 
 ---
 
 ## 安装和设置
 
-### 基本安装
+### NPM 安装
 
 ```bash
 npm install webaudiokit
@@ -49,29 +50,188 @@ const { BGM, SFX, MusicPlayer, Music, PlayMode } = require('webaudiokit');
 
 ---
 
-## BGM 示例
+## 快速开始
 
-### 基础背景音乐
+### 背景音乐 (BGM)
 
 ```javascript
 import { BGM } from 'webaudiokit';
 
 const bgm = new BGM({
-  volume: 0.6,
+  volume: 0.7,
   loop: true,
   fadeIn: 1000,
   fadeOut: 800
 });
 
-// 加载多个音轨
-await bgm.load('menu', 'audio/menu-music.mp3');
-await bgm.load('game', 'audio/game-music.mp3');
-await bgm.load('victory', 'audio/victory-music.mp3');
-
-// 播放并平滑过渡
+// 加载并播放
+await bgm.load('menu', 'audio/menu.mp3');
 await bgm.play('menu');
+
+// 控制播放
+bgm.pause();
+await bgm.resume();
+bgm.stop();
 ```
-### 游戏状态音乐管理
+
+### 音效 (SFX)
+
+```javascript
+import { SFX } from 'webaudiokit';
+
+const sfx = new SFX({ volume: 0.8 });
+
+// 加载并播放
+await sfx.load('click', 'audio/click.wav');
+await sfx.play('click');
+
+// 使用自定义选项播放
+await sfx.play('click', { volume: 0.5, rate: 1.2 });
+
+// 无需预加载直接播放
+await sfx.play('newSound', { src: 'audio/new.wav' });
+```
+
+### 音乐播放器
+
+```javascript
+import { MusicPlayer, Music, PlayMode } from 'webaudiokit';
+
+const player = new MusicPlayer({
+  volume: 0.8,
+  mode: PlayMode.SHUFFLE,
+  fadeIn: 500,
+  fadeOut: 500
+});
+
+// 添加曲目
+const music = new Music('song.mp3', {
+  title: '我的歌曲',
+  artist: '艺术家名称',
+  cover: 'cover.jpg'
+}, 'lyrics.lrc');
+
+player.add(music);
+
+// 控制播放
+await player.play();
+player.pause();
+await player.playNext();
+await player.playPrev();
+```
+
+---
+
+## 配置管理
+
+### 基于 Proxy 的配置
+
+所有类现在都支持使用 Proxy 进行直接属性修改：
+
+```javascript
+const bgm = new BGM({ volume: 0.7, loop: true });
+
+// ✅ 直接修改属性（新功能！）
+bgm.config.enable = false;  // 立即停止播放
+bgm.config.volume = 0.5;    // 立即应用到音频
+bgm.config.stopOnHidden = true;  // 自动设置监听器
+
+// ✅ 对象赋值（仍然有效）
+bgm.config = {
+  volume: 0.6,
+  fadeIn: 1500,
+  stopOnHidden: true
+};
+
+// ✅ 获取当前配置
+const currentConfig = bgm.config;
+console.log(currentConfig.volume); // 0.6
+```
+
+### 启用/禁用控制
+
+```javascript
+const bgm = new BGM();
+const sfx = new SFX();
+const player = new MusicPlayer();
+
+// 开始播放
+await bgm.play('menu');
+await player.play();
+
+// 禁用 - 停止播放并阻止所有方法
+bgm.config.enable = false;      // 停止 BGM
+sfx.config.enable = false;      // 停止所有音效实例
+player.config.enable = false;   // 停止音乐
+
+// 重新启用
+bgm.config.enable = true;
+await bgm.play('menu');  // 再次工作
+```
+
+### 设置面板示例
+
+```javascript
+class AudioSettings {
+  constructor() {
+    this.bgm = new BGM();
+    this.sfx = new SFX();
+    this.player = new MusicPlayer();
+    this.loadSettings();
+  }
+  
+  // 应用用户设置
+  applySettings(settings) {
+    // BGM 设置
+    this.bgm.config = {
+      enable: settings.bgmEnabled,
+      volume: settings.bgmVolume,
+      stopOnHidden: settings.pauseWhenHidden
+    };
+    
+    // SFX 设置
+    this.sfx.config = {
+      enable: settings.sfxEnabled,
+      volume: settings.sfxVolume
+    };
+    
+    // 音乐播放器设置
+    this.player.config = {
+      enable: settings.musicEnabled,
+      volume: settings.musicVolume,
+      mode: settings.playMode,
+      fadeIn: settings.enableFade ? 500 : 0,
+      fadeOut: settings.enableFade ? 500 : 0
+    };
+  }
+  
+  // 保存到 localStorage
+  saveSettings() {
+    localStorage.setItem('audio-settings', JSON.stringify({
+      bgm: this.bgm.config,
+      sfx: this.sfx.config,
+      player: this.player.config
+    }));
+  }
+  
+  // 从 localStorage 加载
+  loadSettings() {
+    const saved = localStorage.getItem('audio-settings');
+    if (saved) {
+      const settings = JSON.parse(saved);
+      this.bgm.config = settings.bgm;
+      this.sfx.config = settings.sfx;
+      this.player.config = settings.player;
+    }
+  }
+}
+```
+
+---
+
+## BGM 示例
+
+### 游戏状态音乐
 
 ```javascript
 class GameAudioManager {
@@ -83,16 +243,20 @@ class GameAudioManager {
       stopOnHidden: true
     });
     
-    this.loadGameMusic();
+    this.loadMusic();
   }
   
-  async loadGameMusic() {
+  async loadMusic() {
     await Promise.all([
       this.bgm.load('menu', 'audio/menu.mp3'),
       this.bgm.load('gameplay', 'audio/gameplay.mp3'),
       this.bgm.load('boss', 'audio/boss-battle.mp3'),
       this.bgm.load('victory', 'audio/victory.mp3')
     ]);
+  }
+  
+  async switchToMenu() {
+    await this.bgm.play('menu');
   }
   
   async switchToGameplay() {
@@ -106,18 +270,23 @@ class GameAudioManager {
   async showVictory() {
     await this.bgm.play('victory');
   }
+  
+  // 动态音量控制
+  setVolume(volume) {
+    this.bgm.config.volume = volume;
+  }
+  
+  // 切换静音
+  toggleMute() {
+    this.bgm.config.enable = !this.bgm.config.enable;
+  }
 }
-
-const gameAudio = new GameAudioManager();
 ```
 
-### 动态音量控制
+### 动态音量淡入淡出
 
 ```javascript
-const bgm = new BGM({ volume: 0.8 });
-
-// 平滑音量过渡
-function fadeVolume(targetVolume, duration = 1000) {
+function smoothVolumeTransition(bgm, targetVolume, duration = 1000) {
   const startVolume = bgm.volume;
   const volumeDiff = targetVolume - startVolume;
   const steps = 50;
@@ -137,7 +306,14 @@ function fadeVolume(targetVolume, duration = 1000) {
 }
 
 // 使用方法
-fadeVolume(0.3); // 淡入到 30% 音量
+const bgm = new BGM({ volume: 0.8 });
+await bgm.play('ambient');
+
+// 对话开始时淡入到 30%
+smoothVolumeTransition(bgm, 0.3, 1000);
+
+// 对话结束时淡出到 80%
+smoothVolumeTransition(bgm, 0.8, 1000);
 ```
 
 ---
@@ -147,8 +323,6 @@ fadeVolume(0.3); // 淡入到 30% 音量
 ### UI 音效
 
 ```javascript
-import { SFX } from 'webaudiokit';
-
 class UISounds {
   constructor() {
     this.sfx = new SFX({ volume: 0.7 });
@@ -160,24 +334,43 @@ class UISounds {
       this.sfx.load('click', 'audio/ui/click.wav'),
       this.sfx.load('hover', 'audio/ui/hover.wav'),
       this.sfx.load('success', 'audio/ui/success.wav'),
-      this.sfx.load('error', 'audio/ui/error.wav'),
-      this.sfx.load('notification', 'audio/ui/notification.wav')
+      this.sfx.load('error', 'audio/ui/error.wav')
     ]);
   }
   
-  playClick() { this.sfx.play('click'); }
-  playHover() { this.sfx.play('hover', { volume: 0.4 }); }
-  playSuccess() { this.sfx.play('success'); }
-  playError() { this.sfx.play('error'); }
-  playNotification() { this.sfx.play('notification'); }
+  playClick() {
+    this.sfx.play('click');
+  }
+  
+  playHover() {
+    this.sfx.play('hover', { volume: 0.4 });
+  }
+  
+  playSuccess() {
+    this.sfx.play('success');
+  }
+  
+  playError() {
+    this.sfx.play('error');
+  }
 }
 
-// 与 DOM 事件结合使用
+// 附加到 DOM 事件
 const ui = new UISounds();
 
 document.querySelectorAll('button').forEach(btn => {
   btn.addEventListener('mouseenter', () => ui.playHover());
   btn.addEventListener('click', () => ui.playClick());
+});
+
+document.getElementById('submit-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await submitForm();
+    ui.playSuccess();
+  } catch (error) {
+    ui.playError();
+  }
 });
 ```
 
@@ -188,33 +381,27 @@ class GameSFX {
   constructor() {
     this.sfx = new SFX({ 
       volume: 0.8,
-      stopOnHidden: false // 标签页隐藏时继续播放
+      stopOnHidden: false
     });
-    this.loadGameSounds();
+    this.loadSounds();
   }
   
-  async loadGameSounds() {
-    const sounds = [
-      'jump', 'land', 'collect', 'powerup', 'hurt', 'explosion',
-      'laser', 'shield', 'teleport', 'victory'
-    ];
-    
+  async loadSounds() {
+    const sounds = ['jump', 'land', 'collect', 'hurt', 'explosion', 'laser'];
     await Promise.all(
-      sounds.map(sound => 
-        this.sfx.load(sound, `audio/game/${sound}.wav`)
-      )
+      sounds.map(sound => this.sfx.load(sound, `audio/game/${sound}.wav`))
     );
   }
   
-  // 快速连发效果
+  // 快速连发带音调变化
   shootLaser() {
     this.sfx.play('laser', { 
       volume: 0.6,
-      rate: 1 + (Math.random() * 0.2 - 0.1) // 轻微音调变化
+      rate: 1 + (Math.random() * 0.2 - 0.1)
     });
   }
   
-  // 重叠爆炸效果
+  // 分层爆炸效果
   explode(intensity = 1) {
     const count = Math.ceil(intensity * 3);
     for (let i = 0; i < count; i++) {
@@ -226,6 +413,14 @@ class GameSFX {
       }, i * 100);
     }
   }
+  
+  // 基于距离的音量
+  playAtDistance(soundId, distance, maxDistance = 100) {
+    const volume = Math.max(0, 1 - (distance / maxDistance));
+    if (volume > 0) {
+      this.sfx.play(soundId, { volume });
+    }
+  }
 }
 ```
 
@@ -233,12 +428,10 @@ class GameSFX {
 
 ## 音乐播放器示例
 
-### 基础音乐播放器
+### 带 UI 的基础播放器
 
 ```javascript
-import { MusicPlayer, Music, PlayMode } from 'webaudiokit';
-
-class MyMusicPlayer {
+class MusicPlayerUI {
   constructor() {
     this.player = new MusicPlayer({
       volume: 0.8,
@@ -249,11 +442,12 @@ class MyMusicPlayer {
     });
     
     this.setupEventListeners();
+    this.setupUI();
   }
   
   setupEventListeners() {
     this.player.on('musicchange', (music) => {
-      this.updateUI(music);
+      this.updateTrackInfo(music);
     });
     
     this.player.on('timeupdate', ({ currentTime, duration }) => {
@@ -264,10 +458,34 @@ class MyMusicPlayer {
       this.displayLyric(lyric);
     });
     
+    this.player.on('play', () => {
+      document.getElementById('play-btn').textContent = '⏸';
+    });
+    
+    this.player.on('pause', () => {
+      document.getElementById('play-btn').textContent = '▶';
+    });
+    
     this.player.on('error', (error) => {
       console.error('播放错误:', error);
-      this.showErrorMessage('播放曲目失败');
+      this.showError('播放曲目失败');
     });
+  }
+  
+  setupUI() {
+    document.getElementById('play-btn').onclick = () => this.togglePlay();
+    document.getElementById('prev-btn').onclick = () => this.player.playPrev();
+    document.getElementById('next-btn').onclick = () => this.player.playNext();
+    
+    document.getElementById('volume-slider').oninput = (e) => {
+      this.player.config.volume = parseFloat(e.target.value);
+    };
+    
+    document.getElementById('progress-bar').onclick = (e) => {
+      const rect = e.target.getBoundingClientRect();
+      const progress = (e.clientX - rect.left) / rect.width;
+      this.player.progress = progress;
+    };
   }
   
   async loadPlaylist(tracks) {
@@ -283,7 +501,15 @@ class MyMusicPlayer {
     this.player.addList(musicList);
   }
   
-  updateUI(music) {
+  async togglePlay() {
+    if (this.player.paused) {
+      await this.player.play();
+    } else {
+      this.player.pause();
+    }
+  }
+  
+  updateTrackInfo(music) {
     const meta = music.meta;
     document.getElementById('track-title').textContent = meta.title || '未知';
     document.getElementById('track-artist').textContent = meta.artist || '未知';
@@ -295,15 +521,14 @@ class MyMusicPlayer {
   
   updateProgress(currentTime, duration) {
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-    document.getElementById('progress-bar').style.width = `${progress}%`;
+    document.getElementById('progress-fill').style.width = `${progress}%`;
     
     document.getElementById('current-time').textContent = this.formatTime(currentTime);
     document.getElementById('total-time').textContent = this.formatTime(duration);
   }
   
   displayLyric(lyric) {
-    const lyricElement = document.getElementById('current-lyric');
-    lyricElement.textContent = lyric ? lyric.text : '';
+    document.getElementById('current-lyric').textContent = lyric ? lyric.text : '';
   }
   
   formatTime(seconds) {
@@ -312,197 +537,113 @@ class MyMusicPlayer {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
+  
+  showError(message) {
+    const errorEl = document.getElementById('error-message');
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+    setTimeout(() => errorEl.style.display = 'none', 3000);
+  }
 }
 ```
 
-### 流媒体音乐播放器
+### 播放列表管理
 
 ```javascript
-class StreamingPlayer {
+class PlaylistManager {
   constructor() {
-    this.player = new MusicPlayer({
-      volume: 0.8,
-      preload: true,
-      stopOnHidden: false
-    });
+    this.player = new MusicPlayer();
+    this.playlists = new Map();
+    this.currentPlaylistId = null;
+  }
+  
+  createPlaylist(id, name, tracks = []) {
+    const playlist = {
+      id,
+      name,
+      tracks: tracks.map(t => new Music(t.url, t.metadata, t.lrcUrl)),
+      createdAt: new Date()
+    };
     
-    this.currentPlaylist = null;
-    this.setupMediaSession();
+    this.playlists.set(id, playlist);
+    return playlist;
   }
   
-  // 从流媒体服务 API 加载
-  async loadFromAPI(playlistId) {
-    try {
-      const response = await fetch(`/api/playlist/${playlistId}`);
-      const data = await response.json();
-      
-      await this.player.addFromMeting(data.tracks);
-      this.currentPlaylist = data;
-      
-      return data;
-    } catch (error) {
-      console.error('加载播放列表失败:', error);
-      throw error;
+  async loadPlaylist(id) {
+    const playlist = this.playlists.get(id);
+    if (!playlist) throw new Error(`播放列表 ${id} 未找到`);
+    
+    this.player.clear();
+    this.player.addList(playlist.tracks);
+    this.currentPlaylistId = id;
+    
+    return playlist;
+  }
+  
+  addToPlaylist(playlistId, track) {
+    const playlist = this.playlists.get(playlistId);
+    if (!playlist) throw new Error(`播放列表 ${playlistId} 未找到`);
+    
+    const music = new Music(track.url, track.metadata, track.lrcUrl);
+    playlist.tracks.push(music);
+    
+    if (this.currentPlaylistId === playlistId) {
+      this.player.add(music);
     }
   }
   
-  // Media Session API 集成
-  setupMediaSession() {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', () => {
-        this.player.play();
-      });
-      
-      navigator.mediaSession.setActionHandler('pause', () => {
-        this.player.pause();
-      });
-      
-      navigator.mediaSession.setActionHandler('previoustrack', () => {
-        this.player.playPrev();
-      });
-      
-      navigator.mediaSession.setActionHandler('nexttrack', () => {
-        this.player.playNext();
-      });
-      
-      this.player.on('musicchange', (music) => {
-        this.updateMediaSession(music);
-      });
+  removeFromPlaylist(playlistId, trackIndex) {
+    const playlist = this.playlists.get(playlistId);
+    if (!playlist) throw new Error(`播放列表 ${playlistId} 未找到`);
+    
+    playlist.tracks.splice(trackIndex, 1);
+    
+    if (this.currentPlaylistId === playlistId) {
+      this.player.remove(trackIndex);
     }
   }
   
-  updateMediaSession(music) {
-    if ('mediaSession' in navigator) {
-      const meta = music.meta;
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: meta.title || '未知曲目',
-        artist: meta.artist || '未知艺术家',
-        album: meta.album || '未知专辑',
-        artwork: meta.cover ? [{ src: meta.cover }] : []
-      });
-    }
+  getAllPlaylists() {
+    return Array.from(this.playlists.values());
   }
 }
 ```
+
 ---
 
 ## 高级模式
 
-### 启用/禁用控制
+### 交叉淡入淡出过渡
 
 ```javascript
-// 使用 enable 属性控制音频播放
-const bgm = new BGM({ enable: true });
-const sfx = new SFX({ enable: true });
-const player = new MusicPlayer({ enable: true });
-
-// 动态禁用/启用
-function toggleAudio(enabled) {
-  bgm.enable = enabled;
-  sfx.enable = enabled;
-  player.enable = enabled;
-}
-
-// 在设置菜单中使用
-class AudioSettings {
+class CrossFadeManager {
   constructor() {
-    this.bgm = new BGM();
-    this.sfx = new SFX();
-    this.player = new MusicPlayer();
+    this.bgmA = new BGM({ volume: 0 });
+    this.bgmB = new BGM({ volume: 0 });
+    this.currentBGM = this.bgmA;
+    this.nextBGM = this.bgmB;
   }
   
-  setBGMEnabled(enabled) {
-    this.bgm.enable = enabled;
-    localStorage.setItem('bgm-enabled', enabled);
-  }
-  
-  setSFXEnabled(enabled) {
-    this.sfx.enable = enabled;
-    localStorage.setItem('sfx-enabled', enabled);
-  }
-  
-  setMusicEnabled(enabled) {
-    this.player.enable = enabled;
-    localStorage.setItem('music-enabled', enabled);
-  }
-  
-  loadSettings() {
-    this.bgm.enable = localStorage.getItem('bgm-enabled') !== 'false';
-    this.sfx.enable = localStorage.getItem('sfx-enabled') !== 'false';
-    this.player.enable = localStorage.getItem('music-enabled') !== 'false';
-  }
-}
-```
-
-### 动态配置更新
-
-```javascript
-// 使用 config getter/setter 动态修改配置
-const player = new MusicPlayer({
-  volume: 0.8,
-  mode: PlayMode.SEQUENTIAL,
-  fadeIn: 500
-});
-
-// 获取当前配置
-const currentConfig = player.config;
-console.log(currentConfig); // { volume: 0.8, mode: 'sequential', ... }
-
-// 更新部分配置（合并方式）
-player.config = {
-  volume: 0.5,
-  mode: PlayMode.SHUFFLE,
-  fadeOut: 1000,
-  stopOnHidden: true  // 动态启用页面隐藏暂停
-};
-
-// BGM 配置更新
-const bgm = new BGM({ volume: 0.7, loop: true });
-
-// 运行时修改配置
-bgm.config = {
-  volume: 0.5,
-  fadeIn: 1500,
-  fadeOut: 1000,
-  stopOnHidden: true  // 动态启用页面隐藏暂停
-};
-
-// SFX 配置更新
-const sfx = new SFX({ volume: 0.8 });
-
-sfx.config = {
-  volume: 0.6,
-  rate: 1.2,
-  stopOnHidden: false  // 动态禁用页面隐藏停止
-};
-
-// 实际应用：用户设置面板
-class UserSettings {
-  constructor(player) {
-    this.player = player;
-  }
-  
-  applySettings(settings) {
-    this.player.config = {
-      volume: settings.musicVolume,
-      mode: settings.playMode,
-      fadeIn: settings.enableFade ? 500 : 0,
-      fadeOut: settings.enableFade ? 500 : 0,
-      enable: settings.musicEnabled,
-      stopOnHidden: settings.pauseWhenHidden
-    };
-  }
-  
-  saveSettings() {
-    const config = this.player.config;
-    localStorage.setItem('player-settings', JSON.stringify(config));
-  }
-  
-  loadSettings() {
-    const saved = localStorage.getItem('player-settings');
-    if (saved) {
-      this.player.config = JSON.parse(saved);
+  async crossFade(trackId, duration = 2000) {
+    // 以 0 音量开始下一首
+    this.nextBGM.config.volume = 0;
+    await this.nextBGM.play(trackId);
+    
+    // 交叉淡入淡出
+    const steps = 50;
+    const stepTime = duration / steps;
+    
+    for (let i = 0; i <= steps; i++) {
+      const progress = i / steps;
+      this.currentBGM.config.volume = 1 - progress;
+      this.nextBGM.config.volume = progress;
+      
+      await new Promise(resolve => setTimeout(resolve, stepTime));
     }
+    
+    // 停止旧音轨并交换
+    this.currentBGM.stop();
+    [this.currentBGM, this.nextBGM] = [this.nextBGM, this.currentBGM];
   }
 }
 ```
@@ -515,14 +656,13 @@ class AudioManager {
     this.bgm = null;
     this.sfx = null;
     this.player = null;
-    this.masterVolume = 1;
     this.isInitialized = false;
   }
   
   async initialize() {
     if (this.isInitialized) return;
     
-    // 等待用户交互后再创建音频
+    // 等待用户交互
     await this.waitForUserInteraction();
     
     this.bgm = new BGM({ volume: 0.7 });
@@ -545,15 +685,7 @@ class AudioManager {
     });
   }
   
-  setMasterVolume(volume) {
-    this.masterVolume = Math.max(0, Math.min(1, volume));
-    
-    if (this.bgm) this.bgm.volume = this.bgm.volume * this.masterVolume;
-    if (this.player) this.player.volume = this.player.volume * this.masterVolume;
-    // SFX 音量在每次播放时应用
-  }
-  
-  async cleanup() {
+  cleanup() {
     if (this.bgm) this.bgm.destroy();
     if (this.sfx) this.sfx.destroy();
     if (this.player) this.player.destroy();
@@ -563,217 +695,305 @@ class AudioManager {
 }
 ```
 
-### 交叉淡入淡出过渡
-
-```javascript
-class CrossFadeManager {
-  constructor() {
-    this.bgmA = new BGM({ volume: 0 });
-    this.bgmB = new BGM({ volume: 0 });
-    this.currentBGM = this.bgmA;
-    this.nextBGM = this.bgmB;
-  }
-  
-  async crossFade(trackId, duration = 2000) {
-    // 以 0 音量开始下一首
-    this.nextBGM.volume = 0;
-    await this.nextBGM.play(trackId);
-    
-    // 在音轨之间交叉淡入淡出
-    const steps = 50;
-    const stepTime = duration / steps;
-    
-    for (let i = 0; i <= steps; i++) {
-      const progress = i / steps;
-      this.currentBGM.volume = 1 - progress;
-      this.nextBGM.volume = progress;
-      
-      await new Promise(resolve => setTimeout(resolve, stepTime));
-    }
-    
-    // 停止旧音轨并交换引用
-    this.currentBGM.stop();
-    [this.currentBGM, this.nextBGM] = [this.nextBGM, this.currentBGM];
-  }
-}
-```
-
 ---
 
-## 集成示例
+## 框架集成
 
-### React 集成
+### React Hook
 
 ```jsx
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MusicPlayer, Music, PlayMode } from 'webaudiokit';
 
-function MusicPlayerComponent({ playlist }) {
+function useMusicPlayer(options = {}) {
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [progress, setProgress] = useState(0);
-  const [volume, setVolume] = useState(0.8);
   
   useEffect(() => {
-    // 初始化播放器
     playerRef.current = new MusicPlayer({
-      volume,
+      volume: 0.8,
       mode: PlayMode.SHUFFLE,
-      fadeIn: 300,
-      fadeOut: 300
+      ...options
     });
     
     const player = playerRef.current;
     
-    // 事件监听器
     player.on('play', () => setIsPlaying(true));
     player.on('pause', () => setIsPlaying(false));
     player.on('stop', () => setIsPlaying(false));
-    
-    player.on('musicchange', (music) => {
-      setCurrentTrack(music);
-    });
-    
+    player.on('musicchange', setCurrentTrack);
     player.on('timeupdate', ({ currentTime, duration }) => {
       setProgress(duration > 0 ? currentTime / duration : 0);
     });
     
-    // 清理
-    return () => {
-      player.destroy();
-    };
+    return () => player.destroy();
   }, []);
-  
-  useEffect(() => {
-    if (playerRef.current && playlist) {
-      const musicList = playlist.map(track => 
-        new Music(track.url, track.metadata, track.lrcUrl)
-      );
-      
-      playerRef.current.clear();
-      playerRef.current.addList(musicList);
-    }
-  }, [playlist]);
-  
-  useEffect(() => {
-    if (playerRef.current) {
-      playerRef.current.volume = volume;
-    }
-  }, [volume]);
   
   const togglePlay = async () => {
     if (!playerRef.current) return;
     
-    try {
-      if (isPlaying) {
-        playerRef.current.pause();
-      } else {
-        await playerRef.current.play();
-      }
-    } catch (error) {
-      console.error('播放错误:', error);
+    if (isPlaying) {
+      playerRef.current.pause();
+    } else {
+      await playerRef.current.play();
     }
   };
   
+  return {
+    player: playerRef.current,
+    isPlaying,
+    currentTrack,
+    progress,
+    togglePlay
+  };
+}
+
+// 使用方法
+function MusicPlayerComponent({ playlist }) {
+  const { player, isPlaying, currentTrack, progress, togglePlay } = useMusicPlayer();
+  
+  useEffect(() => {
+    if (player && playlist) {
+      const musicList = playlist.map(t => new Music(t.url, t.metadata, t.lrcUrl));
+      player.clear();
+      player.addList(musicList);
+    }
+  }, [player, playlist]);
+  
   return (
-    <div className="music-player">
-      <div className="track-info">
-        <h3>{currentTrack?.meta.title || '无曲目'}</h3>
-        <p>{currentTrack?.meta.artist || '未知艺术家'}</p>
-      </div>
-      
-      <div className="controls">
-        <button onClick={() => playerRef.current?.playPrev()}>⏮</button>
-        <button onClick={togglePlay}>
-          {isPlaying ? '⏸' : '▶'}
-        </button>
-        <button onClick={() => playerRef.current?.playNext()}>⏭</button>
-      </div>
-      
+    <div>
+      <h3>{currentTrack?.meta.title || '无曲目'}</h3>
+      <button onClick={togglePlay}>{isPlaying ? '暂停' : '播放'}</button>
       <div className="progress-bar">
-        <div 
-          className="progress-fill" 
-          style={{ width: `${progress * 100}%` }}
-        />
+        <div style={{ width: `${progress * 100}%` }} />
       </div>
-      
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={volume}
-        onChange={(e) => setVolume(parseFloat(e.target.value))}
-      />
     </div>
   );
 }
 ```
 
----
-
-## 性能优化
-
-### 1. 懒加载策略
+### Vue Composable
 
 ```javascript
-class OptimizedAudioManager {
-  constructor() {
-    this.bgm = new BGM({ preload: false }); // 不预加载所有内容
-    this.sfx = new SFX({ preload: false });
-    this.loadedAssets = new Set();
-  }
+import { ref, onMounted, onUnmounted } from 'vue';
+import { MusicPlayer, Music, PlayMode } from 'webaudiokit';
+
+export function useMusicPlayer(options = {}) {
+  const player = ref(null);
+  const isPlaying = ref(false);
+  const currentTrack = ref(null);
+  const progress = ref(0);
   
-  async loadOnDemand(type, id, src) {
-    const key = `${type}:${id}`;
-    if (this.loadedAssets.has(key)) return;
+  onMounted(() => {
+    player.value = new MusicPlayer({
+      volume: 0.8,
+      mode: PlayMode.SHUFFLE,
+      ...options
+    });
     
-    if (type === 'bgm') {
-      await this.bgm.load(id, src);
-    } else if (type === 'sfx') {
-      await this.sfx.load(id, src);
+    player.value.on('play', () => isPlaying.value = true);
+    player.value.on('pause', () => isPlaying.value = false);
+    player.value.on('stop', () => isPlaying.value = false);
+    player.value.on('musicchange', (music) => currentTrack.value = music);
+    player.value.on('timeupdate', ({ currentTime, duration }) => {
+      progress.value = duration > 0 ? currentTime / duration : 0;
+    });
+  });
+  
+  onUnmounted(() => {
+    if (player.value) {
+      player.value.destroy();
     }
+  });
+  
+  const togglePlay = async () => {
+    if (!player.value) return;
     
-    this.loadedAssets.add(key);
+    if (isPlaying.value) {
+      player.value.pause();
+    } else {
+      await player.value.play();
+    }
+  };
+  
+  return {
+    player,
+    isPlaying,
+    currentTrack,
+    progress,
+    togglePlay
+  };
+}
+```
+
+---
+
+## 最佳实践
+
+### 1. 始终处理用户交互
+
+现代浏览器在播放音频前需要用户交互：
+
+```javascript
+class AudioInitializer {
+  constructor() {
+    this.isUnlocked = false;
+    this.audioManager = null;
   }
   
-  async playBGM(id, src) {
-    await this.loadOnDemand('bgm', id, src);
-    return this.bgm.play(id);
-  }
-  
-  async playSFX(id, src) {
-    await this.loadOnDemand('sfx', id, src);
-    return this.sfx.play(id);
+  async initialize() {
+    if (this.isUnlocked) return;
+    
+    return new Promise(resolve => {
+      const unlock = async () => {
+        // 创建静音音频以解锁
+        const audio = new Audio();
+        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT';
+        
+        try {
+          await audio.play();
+          this.isUnlocked = true;
+          this.audioManager = new AudioManager();
+          resolve();
+        } catch (e) {
+          // 仍然锁定
+        }
+        
+        document.removeEventListener('click', unlock);
+        document.removeEventListener('touchstart', unlock);
+      };
+      
+      document.addEventListener('click', unlock);
+      document.addEventListener('touchstart', unlock);
+    });
   }
 }
 ```
 
-### 2. 内存管理
+### 2. 清理资源
 
 ```javascript
-class MemoryEfficientPlayer {
+class Component {
   constructor() {
-    this.player = new MusicPlayer({ preload: true });
-    this.maxCacheSize = 50; // 内存中保留的最大曲目数
-    this.trackCache = new Map();
+    this.bgm = new BGM();
+    this.sfx = new SFX();
+    this.player = new MusicPlayer();
   }
   
-  async addTrack(music) {
-    // 如果缓存已满，移除最旧的曲目
-    if (this.trackCache.size >= this.maxCacheSize) {
-      const oldestKey = this.trackCache.keys().next().value;
-      this.trackCache.delete(oldestKey);
+  destroy() {
+    // 组件卸载时始终清理
+    this.bgm.destroy();
+    this.sfx.destroy();
+    this.player.destroy();
+  }
+}
+```
+
+### 3. 优雅地处理错误
+
+```javascript
+async function playWithErrorHandling(player) {
+  try {
+    await player.play();
+  } catch (error) {
+    if (error.name === 'NotAllowedError') {
+      showMessage('请与页面交互以启用音频');
+    } else if (error.name === 'NotSupportedError') {
+      showMessage('不支持的音频格式');
+    } else {
+      showMessage('播放失败: ' + error.message);
+    }
+  }
+}
+```
+
+### 4. 明智地使用配置
+
+```javascript
+// ✅ 好：单个更改使用直接属性修改
+player.config.volume = 0.5;
+player.config.enable = false;
+
+// ✅ 好：多个更改使用对象赋值
+player.config = {
+  volume: 0.5,
+  mode: PlayMode.SHUFFLE,
+  fadeIn: 500,
+  fadeOut: 500
+};
+
+// ❌ 避免：多次单独赋值
+player.config = { volume: 0.5 };
+player.config = { mode: PlayMode.SHUFFLE };
+player.config = { fadeIn: 500 };
+```
+
+### 5. 针对移动端优化
+
+```javascript
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+const player = new MusicPlayer({
+  volume: 0.8,
+  preload: !isMobile,  // 移动端禁用预加载以节省带宽
+  stopOnHidden: isMobile,  // 移动端标签页隐藏时暂停
+  fadeIn: isMobile ? 200 : 500,  // 移动端使用更短的淡入淡出
+  fadeOut: isMobile ? 200 : 500
+});
+```
+
+### 6. 实现懒加载
+
+```javascript
+class LazyAudioLoader {
+  constructor() {
+    this.bgm = new BGM({ preload: false });
+    this.loadedTracks = new Set();
+  }
+  
+  async playTrack(id, src) {
+    if (!this.loadedTracks.has(id)) {
+      await this.bgm.load(id, src);
+      this.loadedTracks.add(id);
     }
     
-    this.trackCache.set(music.url, music);
-    this.player.add(music);
+    await this.bgm.play(id);
+  }
+}
+```
+
+### 7. 监控性能
+
+```javascript
+class AudioPerformanceMonitor {
+  constructor(player) {
+    this.player = player;
+    this.metrics = {
+      loadTime: 0,
+      playCount: 0,
+      errorCount: 0
+    };
+    
+    this.setupMonitoring();
   }
   
-  clearCache() {
-    this.trackCache.clear();
-    this.player.clear();
+  setupMonitoring() {
+    const startTime = performance.now();
+    
+    this.player.on('play', () => {
+      this.metrics.playCount++;
+      this.metrics.loadTime = performance.now() - startTime;
+    });
+    
+    this.player.on('error', () => {
+      this.metrics.errorCount++;
+    });
+  }
+  
+  getMetrics() {
+    return { ...this.metrics };
   }
 }
 ```
@@ -782,125 +1002,27 @@ class MemoryEfficientPlayer {
 
 ## 故障排除
 
-### 常见问题和解决方案
+### 音频无法播放
 
-#### 1. 移动端音频无法播放
+1. 检查用户是否与页面交互过
+2. 验证音频文件格式是否受支持
+3. 检查浏览器控制台错误
+4. 确保 `enable` 设置为 `true`
 
-```javascript
-// 解决方案：等待用户交互
-class MobileAudioFix {
-  constructor() {
-    this.isUnlocked = false;
-    this.pendingActions = [];
-  }
-  
-  async initialize() {
-    if (this.isUnlocked) return;
-    
-    return new Promise(resolve => {
-      const unlock = async () => {
-        // 创建并播放静音音频以解锁
-        const audio = new Audio();
-        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT';
-        
-        try {
-          await audio.play();
-          this.isUnlocked = true;
-          
-          // 执行待处理的操作
-          this.pendingActions.forEach(action => action());
-          this.pendingActions = [];
-          
-          resolve();
-        } catch (e) {
-          // 仍然锁定，继续尝试
-        }
-        
-        document.removeEventListener('touchstart', unlock);
-        document.removeEventListener('click', unlock);
-      };
-      
-      document.addEventListener('touchstart', unlock);
-      document.addEventListener('click', unlock);
-    });
-  }
-  
-  async safePlay(audioInstance, method, ...args) {
-    if (this.isUnlocked) {
-      return audioInstance[method](...args);
-    } else {
-      return new Promise(resolve => {
-        this.pendingActions.push(() => {
-          audioInstance[method](...args).then(resolve);
-        });
-      });
-    }
-  }
-}
-```
+### 内存使用过高
 
-#### 2. 自动播放策略处理
+1. 启用懒加载 (`preload: false`)
+2. 定期清理未使用的播放列表
+3. 限制并发音效实例数量
+4. 完成后调用 `destroy()`
 
-```javascript
-class AutoplayHandler {
-  static async handleAutoplay(audioInstance, playMethod, ...args) {
-    try {
-      await audioInstance[playMethod](...args);
-      return { success: true };
-    } catch (error) {
-      if (error.name === 'NotAllowedError') {
-        return { 
-          success: false, 
-          reason: 'autoplay-blocked',
-          message: '自动播放被阻止。需要用户交互。'
-        };
-      }
-      throw error;
-    }
-  }
-  
-  static showAutoplayPrompt() {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = `
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.8); display: flex;
-      align-items: center; justify-content: center;
-      z-index: 10000; color: white; font-family: sans-serif;
-    `;
-    
-    overlay.innerHTML = `
-      <div style="text-align: center; padding: 20px;">
-        <h3>启用音频</h3>
-        <p>点击以启用音频播放</p>
-        <button style="padding: 10px 20px; font-size: 16px;">
-          启用音频
-        </button>
-      </div>
-    `;
-    
-    return new Promise(resolve => {
-      overlay.querySelector('button').onclick = () => {
-        document.body.removeChild(overlay);
-        resolve();
-      };
-      
-      document.body.appendChild(overlay);
-    });
-  }
-}
-```
+### 播放卡顿
+
+1. 减少淡入淡出时长
+2. 为下一首启用预加载
+3. 使用较低质量的音频文件
+4. 减少并发音频实例数量
 
 ---
 
-## 最佳实践总结
-
-1. **始终处理用户交互要求** - 现代浏览器需要用户交互才能播放音频
-2. **使用适当的淡入淡出时间** - 300-1000ms 适用于大多数过渡
-3. **实现适当的错误处理** - 网络问题和编解码器问题很常见
-4. **清理资源** - 组件卸载时调用 `destroy()` 方法
-5. **考虑移动端限制** - 较低质量的音频和较少的同时播放音效
-6. **策略性预加载** - 平衡用户体验和带宽使用
-7. **处理页面可见性** - 标签页隐藏/显示时暂停/恢复音频
-8. **明智使用事件监听器** - 移除监听器以防止内存泄漏
-9. **跨浏览器测试** - 不同浏览器和设备的音频支持有所不同
-10. **提供后备方案** - 音频加载或播放失败时始终有备用计划
+更多示例和 API 详情，请参阅 [API_zh.md](API_zh.md)。

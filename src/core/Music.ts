@@ -9,6 +9,7 @@ import { Lrc } from 'lrc-kit';
 export class Music {
   private src: string;
   private metadata: Metadata;
+  private metadataProxy: Metadata;
   private lyrics: Lyric[] = [];
   private lrcUrl: string | null;
   private lrcLoaded: boolean = false;
@@ -18,6 +19,8 @@ export class Music {
     this.metadata = metadata;
     this.lrcUrl = lrcUrl;
 
+    this.metadataProxy = this.createMetadataProxy();
+
     // 如果直接传了 lrc 文本，立即解析
     if (this.metadata.lrc) {
       this.lyrics = Music.parseLyrics(this.metadata.lrc);
@@ -25,20 +28,36 @@ export class Music {
     }
   }
 
+  private createMetadataProxy(): Metadata {
+    return new Proxy(this.metadata, {
+      set: (target, prop: string, value) => {
+        (target as any)[prop] = value;
+        
+        // 如果修改了 lrc，重新解析歌词
+        if (prop === 'lrc' && value) {
+          this.lyrics = Music.parseLyrics(value);
+          this.lrcLoaded = true;
+        }
+        return true;
+      }
+    });
+  }
+
   get url(): string {
     return this.src;
   }
 
   get meta(): Metadata {
-    return { ...this.metadata };
+    return this.metadataProxy;
   }
 
   set meta(data: Partial<Metadata>) {
-    this.metadata = { ...this.metadata, ...data };
-    if (data.lrc) {
-      this.lyrics = Music.parseLyrics(data.lrc);
-      this.lrcLoaded = true;
-    }
+    Object.keys(data).forEach(key => {
+      const k = key as keyof Metadata;
+      if (data[k] !== undefined) {
+        (this.metadataProxy as any)[k] = data[k];
+      }
+    });
   }
 
   /**
@@ -50,7 +69,7 @@ export class Music {
       const text = await fetch(this.lrcUrl).then(r => r.text());
       this.lyrics = Music.parseLyrics(text);
     } catch {
-      console.warn(`Failed to fetch lyrics: ${this.metadata.title}`);
+      // Silently fail if lyrics cannot be fetched
     }
     this.lrcLoaded = true;
   }
@@ -81,8 +100,7 @@ export class Music {
     try {
       const lrc = Lrc.parse(text);
       return lrc.lyrics.map(line => ({ time: line.timestamp, text: line.content }));
-    } catch (error) {
-      console.warn('Failed to parse lyrics:', error);
+    } catch {
       return [];
     }
   }

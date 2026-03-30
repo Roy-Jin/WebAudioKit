@@ -39,7 +39,7 @@ new BGM(options?: BGMOptions)
 | `fadeOut` | `number` | `0` | Fade out duration (ms) |
 | `stopOnHidden` | `boolean` | `false` | Auto-pause when page hidden |
 | `preload` | `boolean` | `false` | Preload audio files |
-| `enable` | `boolean` | `true` | Enable BGM (blocks all methods when false) |
+| `enable` | `boolean` | `true` | Enable BGM playback |
 
 ### Methods
 
@@ -66,6 +66,12 @@ Resume paused playback with fade in effect.
 #### `stop(): void`
 Stop playback and reset position.
 
+#### `on(event: EventType, listener: EventListener): void`
+Add event listener.
+
+#### `off(event: EventType, listener: EventListener): void`
+Remove event listener.
+
 #### `destroy(): void`
 Clean up resources and remove event listeners.
 
@@ -73,15 +79,44 @@ Clean up resources and remove event listeners.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `volume` | `number` | Current volume (0-1) |
-| `rate` | `number` | Current playback rate |
-| `loop` | `boolean` | Loop enabled |
+| `volume` | `number` | Current volume (0-1), setter applies immediately |
+| `rate` | `number` | Current playback rate, setter applies immediately |
+| `loop` | `boolean` | Loop enabled, setter applies immediately |
 | `currentTime` | `number` | Current playback position (seconds) |
 | `duration` | `number` | Total duration (seconds) |
-| `paused` | `boolean` | Whether playback is paused |
-| `playing` | `string \| null` | Currently playing track ID |
-| `enable` | `boolean` | Whether BGM is enabled |
-| `config` | `BGMOptions` | Get/set config (setter merges with existing, auto-handles stopOnHidden listener) |
+| `paused` | `boolean` | Whether playback is paused (read-only) |
+| `playing` | `string \| null` | Currently playing track ID (read-only) |
+| `config` | `BGMOptions` | Configuration object with Proxy support |
+
+### Configuration Management
+
+The `config` property uses Proxy to detect deep property changes:
+
+```javascript
+const bgm = new BGM({ volume: 0.7, loop: true });
+
+// ✅ Both ways work now!
+bgm.config.enable = false;  // Stops playback immediately
+bgm.config = { enable: false };  // Also works
+
+// Direct property modification is detected
+bgm.config.volume = 0.5;  // Applied to audio immediately
+bgm.config.stopOnHidden = true;  // Listener setup automatically
+
+// Batch update
+bgm.config = {
+  volume: 0.6,
+  fadeIn: 1500,
+  stopOnHidden: true
+};
+```
+
+**Auto-handled config changes:**
+- `enable`: Stops playback when set to `false`
+- `volume`: Applied to current audio immediately
+- `rate`: Applied to current audio immediately
+- `loop`: Applied to current audio immediately
+- `stopOnHidden`: Visibility listener setup/teardown automatically
 
 ### Events
 
@@ -90,7 +125,7 @@ bgm.on('play', () => console.log('Started'));
 bgm.on('pause', () => console.log('Paused'));
 bgm.on('stop', () => console.log('Stopped'));
 bgm.on('ended', () => console.log('Ended'));
-bgm.on('timeupdate', (data) => console.log(data.currentTime));
+bgm.on('timeupdate', (data) => console.log(data.currentTime, data.duration));
 bgm.on('volumechange', (volume) => console.log(volume));
 bgm.on('error', (error) => console.error(error));
 ```
@@ -115,7 +150,7 @@ new SFX(options?: SFXOptions)
 | `rate` | `number` | `1` | Default playback rate |
 | `stopOnHidden` | `boolean` | `false` | Stop all when page hidden |
 | `preload` | `boolean` | `false` | Preload audio files |
-| `enable` | `boolean` | `true` | Enable SFX (blocks all methods when false) |
+| `enable` | `boolean` | `true` | Enable SFX playback |
 
 ### Methods
 
@@ -148,9 +183,23 @@ Clean up all resources.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `activeCount` | `number` | Number of currently playing instances |
-| `enable` | `boolean` | Whether SFX is enabled |
-| `config` | `SFXOptions` | Get/set config (setter merges with existing, auto-handles stopOnHidden listener) |
+| `activeCount` | `number` | Number of currently playing instances (read-only) |
+| `config` | `SFXOptions` | Configuration object with Proxy support |
+
+### Configuration Management
+
+```javascript
+const sfx = new SFX({ volume: 0.8 });
+
+// Direct property modification works
+sfx.config.enable = false;  // Stops all instances immediately
+sfx.config.volume = 0.6;  // Applied to future plays
+sfx.config.stopOnHidden = true;  // Listener setup automatically
+```
+
+**Auto-handled config changes:**
+- `enable`: Stops all instances when set to `false`
+- `stopOnHidden`: Visibility listener setup/teardown automatically
 
 ---
 
@@ -190,15 +239,34 @@ Get lyric at specific time position.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `url` | `string` | Audio file URL |
-| `meta` | `Metadata` | Track metadata |
-| `hasLyrics` | `boolean` | Whether lyrics are available |
-| `lyricsReady` | `boolean` | Whether lyrics are loaded |
+| `url` | `string` | Audio file URL (read-only) |
+| `meta` | `Metadata` | Track metadata with Proxy support |
+| `hasLyrics` | `boolean` | Whether lyrics are available (read-only) |
+| `lyricsReady` | `boolean` | Whether lyrics are loaded (read-only) |
+
+### Metadata Management
+
+The `meta` property uses Proxy to detect property changes:
+
+```javascript
+const music = new Music('song.mp3', { title: 'My Song' });
+
+// ✅ Both ways work now!
+music.meta.title = 'New Title';  // Direct modification works
+music.meta = { title: 'New Title' };  // Also works
+
+// LRC auto-parsing
+music.meta.lrc = '[00:12.00]Hello world';  // Lyrics parsed automatically
+```
 
 ### Static Methods
 
 #### `Music.parseLyrics(text: string): Lyric[]`
 Parse LRC format lyrics text.
+
+```javascript
+const lyrics = Music.parseLyrics('[00:12.00]First line\n[00:15.00]Second line');
+```
 
 ---
 
@@ -225,7 +293,7 @@ new MusicPlayer(options?: MusicPlayerOptions)
 | `fadeOut` | `number` | `0` | Fade out duration (ms) |
 | `stopOnHidden` | `boolean` | `false` | Auto-pause when page hidden |
 | `preload` | `boolean` | `true` | Preload next track |
-| `enable` | `boolean` | `true` | Enable player (blocks all methods when false) |
+| `enable` | `boolean` | `true` | Enable player playback |
 
 ### Playlist Management
 
@@ -265,21 +333,48 @@ Play previous track according to play mode.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `volume` | `number` | Current volume (0-1) |
-| `rate` | `number` | Current playback rate |
-| `loop` | `boolean` | Track loop enabled |
+| `volume` | `number` | Current volume (0-1), setter applies immediately |
+| `rate` | `number` | Current playback rate, setter applies immediately |
+| `loop` | `boolean` | Track loop enabled, setter applies immediately |
 | `currentTime` | `number` | Current position (seconds) |
-| `duration` | `number` | Current track duration |
-| `paused` | `boolean` | Whether paused |
-| `state` | `PlayState` | Current player state |
+| `duration` | `number` | Current track duration (read-only) |
+| `paused` | `boolean` | Whether paused (read-only) |
+| `state` | `PlayState` | Current player state (read-only) |
 | `progress` | `number` | Playback progress (0-1) |
-| `current` | `Music \| null` | Currently loaded track |
-| `length` | `number` | Playlist length |
+| `current` | `Music \| null` | Currently loaded track (read-only) |
+| `length` | `number` | Playlist length (read-only) |
 | `currentIndex` | `number` | Current track index |
-| `playMode` | `PlayMode` | Current play mode |
-| `lyric` | `Lyric \| null` | Current lyric line |
-| `enable` | `boolean` | Whether player is enabled |
-| `config` | `MusicPlayerOptions` | Get/set config (setter merges with existing, auto-handles stopOnHidden listener and play mode) |
+| `playMode` | `PlayMode` | Current play mode, setter rebuilds shuffle |
+| `lyric` | `Lyric \| null` | Current lyric line (read-only) |
+| `config` | `MusicPlayerOptions` | Configuration object with Proxy support |
+
+### Configuration Management
+
+```javascript
+const player = new MusicPlayer({ volume: 0.8, mode: PlayMode.SEQUENTIAL });
+
+// Direct property modification works
+player.config.enable = false;  // Stops playback immediately
+player.config.volume = 0.5;  // Applied to audio immediately
+player.config.mode = PlayMode.SHUFFLE;  // Rebuilds shuffle order automatically
+player.config.stopOnHidden = true;  // Listener setup automatically
+
+// Batch update
+player.config = {
+  volume: 0.6,
+  mode: PlayMode.LOOP,
+  fadeIn: 500,
+  fadeOut: 500
+};
+```
+
+**Auto-handled config changes:**
+- `enable`: Stops playback when set to `false`
+- `volume`: Applied to current audio immediately
+- `rate`: Applied to current audio immediately
+- `loop`: Applied to current audio immediately
+- `mode`: Rebuilds shuffle order if set to `SHUFFLE`
+- `stopOnHidden`: Visibility listener setup/teardown automatically
 
 ### Playlist Access
 
@@ -451,3 +546,5 @@ player.on('error', (error) => {
 4. **Handle page visibility** - Use `stopOnHidden` for better mobile experience
 5. **Fade effects** - Use fade in/out for smooth transitions
 6. **Event listeners** - Remove listeners when components unmount
+7. **Use Proxy config** - Direct property modification (`config.enable = false`) is now supported
+8. **Batch updates** - Use object assignment for multiple config changes at once

@@ -39,7 +39,7 @@ new BGM(options?: BGMOptions)
 | `fadeOut` | `number` | `0` | 淡出时长 (毫秒) |
 | `stopOnHidden` | `boolean` | `false` | 页面隐藏时自动暂停 |
 | `preload` | `boolean` | `false` | 预加载音频文件 |
-| `enable` | `boolean` | `true` | 是否启用 BGM（为 false 时阻止所有方法） |
+| `enable` | `boolean` | `true` | 启用 BGM 播放 |
 
 ### 方法
 
@@ -66,6 +66,12 @@ await bgm.play('menu');
 #### `stop(): void`
 停止播放并重置位置。
 
+#### `on(event: EventType, listener: EventListener): void`
+添加事件监听器。
+
+#### `off(event: EventType, listener: EventListener): void`
+移除事件监听器。
+
 #### `destroy(): void`
 清理资源并移除事件监听器。
 
@@ -73,15 +79,44 @@ await bgm.play('menu');
 
 | 属性 | 类型 | 描述 |
 |------|------|------|
-| `volume` | `number` | 当前音量 (0-1) |
-| `rate` | `number` | 当前播放速率 |
-| `loop` | `boolean` | 是否启用循环 |
+| `volume` | `number` | 当前音量 (0-1)，setter 立即应用 |
+| `rate` | `number` | 当前播放速率，setter 立即应用 |
+| `loop` | `boolean` | 是否启用循环，setter 立即应用 |
 | `currentTime` | `number` | 当前播放位置 (秒) |
 | `duration` | `number` | 总时长 (秒) |
-| `paused` | `boolean` | 是否暂停 |
-| `playing` | `string \| null` | 当前播放的音轨 ID |
-| `enable` | `boolean` | 是否启用 BGM |
-| `config` | `BGMOptions` | 获取/设置配置（setter 使用合并方式，自动处理 stopOnHidden 监听器） |
+| `paused` | `boolean` | 是否暂停 (只读) |
+| `playing` | `string \| null` | 当前播放的音轨 ID (只读) |
+| `config` | `BGMOptions` | 支持 Proxy 的配置对象 |
+
+### 配置管理
+
+`config` 属性使用 Proxy 来检测深层属性变化：
+
+```javascript
+const bgm = new BGM({ volume: 0.7, loop: true });
+
+// ✅ 两种方式现在都可以工作！
+bgm.config.enable = false;  // 立即停止播放
+bgm.config = { enable: false };  // 也可以
+
+// 直接修改属性会被检测到
+bgm.config.volume = 0.5;  // 立即应用到音频
+bgm.config.stopOnHidden = true;  // 自动设置监听器
+
+// 批量更新
+bgm.config = {
+  volume: 0.6,
+  fadeIn: 1500,
+  stopOnHidden: true
+};
+```
+
+**自动处理的配置变更：**
+- `enable`: 设为 `false` 时停止播放
+- `volume`: 立即应用到当前音频
+- `rate`: 立即应用到当前音频
+- `loop`: 立即应用到当前音频
+- `stopOnHidden`: 自动设置/移除可见性监听器
 
 ### 事件
 
@@ -90,7 +125,7 @@ bgm.on('play', () => console.log('开始播放'));
 bgm.on('pause', () => console.log('已暂停'));
 bgm.on('stop', () => console.log('已停止'));
 bgm.on('ended', () => console.log('播放结束'));
-bgm.on('timeupdate', (data) => console.log(data.currentTime));
+bgm.on('timeupdate', (data) => console.log(data.currentTime, data.duration));
 bgm.on('volumechange', (volume) => console.log(volume));
 bgm.on('error', (error) => console.error(error));
 ```
@@ -115,7 +150,7 @@ new SFX(options?: SFXOptions)
 | `rate` | `number` | `1` | 默认播放速率 |
 | `stopOnHidden` | `boolean` | `false` | 页面隐藏时停止所有音效 |
 | `preload` | `boolean` | `false` | 预加载音频文件 |
-| `enable` | `boolean` | `true` | 是否启用 SFX（为 false 时阻止所有方法） |
+| `enable` | `boolean` | `true` | 启用 SFX 播放 |
 
 ### 方法
 
@@ -148,9 +183,23 @@ await sfx.play('newSound', { src: 'sounds/new.wav' }); // 直接指定源文件
 
 | 属性 | 类型 | 描述 |
 |------|------|------|
-| `activeCount` | `number` | 当前播放的实例数量 |
-| `enable` | `boolean` | 是否启用 SFX |
-| `config` | `SFXOptions` | 获取/设置配置（setter 使用合并方式，自动处理 stopOnHidden 监听器） |
+| `activeCount` | `number` | 当前播放的实例数量 (只读) |
+| `config` | `SFXOptions` | 支持 Proxy 的配置对象 |
+
+### 配置管理
+
+```javascript
+const sfx = new SFX({ volume: 0.8 });
+
+// 直接修改属性可以工作
+sfx.config.enable = false;  // 立即停止所有实例
+sfx.config.volume = 0.6;  // 应用到未来的播放
+sfx.config.stopOnHidden = true;  // 自动设置监听器
+```
+
+**自动处理的配置变更：**
+- `enable`: 设为 `false` 时停止所有实例
+- `stopOnHidden`: 自动设置/移除可见性监听器
 
 ---
 
@@ -190,15 +239,34 @@ new Music(src: string, metadata?: Metadata, lrcUrl?: string | null)
 
 | 属性 | 类型 | 描述 |
 |------|------|------|
-| `url` | `string` | 音频文件 URL |
-| `meta` | `Metadata` | 曲目元数据 |
-| `hasLyrics` | `boolean` | 是否有歌词 |
-| `lyricsReady` | `boolean` | 歌词是否已加载 |
+| `url` | `string` | 音频文件 URL (只读) |
+| `meta` | `Metadata` | 支持 Proxy 的曲目元数据 |
+| `hasLyrics` | `boolean` | 是否有歌词 (只读) |
+| `lyricsReady` | `boolean` | 歌词是否已加载 (只读) |
+
+### 元数据管理
+
+`meta` 属性使用 Proxy 来检测属性变化：
+
+```javascript
+const music = new Music('song.mp3', { title: 'My Song' });
+
+// ✅ 两种方式现在都可以工作！
+music.meta.title = 'New Title';  // 直接修改可以工作
+music.meta = { title: 'New Title' };  // 也可以
+
+// LRC 自动解析
+music.meta.lrc = '[00:12.00]Hello world';  // 歌词自动解析
+```
 
 ### 静态方法
 
 #### `Music.parseLyrics(text: string): Lyric[]`
 解析 LRC 格式歌词文本。
+
+```javascript
+const lyrics = Music.parseLyrics('[00:12.00]第一行\n[00:15.00]第二行');
+```
 
 ---
 
@@ -225,7 +293,7 @@ new MusicPlayer(options?: MusicPlayerOptions)
 | `fadeOut` | `number` | `0` | 淡出时长 (毫秒) |
 | `stopOnHidden` | `boolean` | `false` | 页面隐藏时自动暂停 |
 | `preload` | `boolean` | `true` | 预加载下一首 |
-| `enable` | `boolean` | `true` | 是否启用播放器（为 false 时阻止所有方法） |
+| `enable` | `boolean` | `true` | 启用播放器播放 |
 
 ### 播放列表管理
 
@@ -265,21 +333,48 @@ new MusicPlayer(options?: MusicPlayerOptions)
 
 | 属性 | 类型 | 描述 |
 |------|------|------|
-| `volume` | `number` | 当前音量 (0-1) |
-| `rate` | `number` | 当前播放速率 |
-| `loop` | `boolean` | 曲目循环启用 |
+| `volume` | `number` | 当前音量 (0-1)，setter 立即应用 |
+| `rate` | `number` | 当前播放速率，setter 立即应用 |
+| `loop` | `boolean` | 曲目循环启用，setter 立即应用 |
 | `currentTime` | `number` | 当前位置 (秒) |
-| `duration` | `number` | 当前曲目时长 |
-| `paused` | `boolean` | 是否暂停 |
-| `state` | `PlayState` | 当前播放器状态 |
+| `duration` | `number` | 当前曲目时长 (只读) |
+| `paused` | `boolean` | 是否暂停 (只读) |
+| `state` | `PlayState` | 当前播放器状态 (只读) |
 | `progress` | `number` | 播放进度 (0-1) |
-| `current` | `Music \| null` | 当前加载的曲目 |
-| `length` | `number` | 播放列表长度 |
+| `current` | `Music \| null` | 当前加载的曲目 (只读) |
+| `length` | `number` | 播放列表长度 (只读) |
 | `currentIndex` | `number` | 当前曲目索引 |
-| `playMode` | `PlayMode` | 当前播放模式 |
-| `lyric` | `Lyric \| null` | 当前歌词行 |
-| `enable` | `boolean` | 是否启用播放器 |
-| `config` | `MusicPlayerOptions` | 获取/设置配置（setter 使用合并方式，自动处理 stopOnHidden 监听器和播放模式） |
+| `playMode` | `PlayMode` | 当前播放模式，setter 重建随机顺序 |
+| `lyric` | `Lyric \| null` | 当前歌词行 (只读) |
+| `config` | `MusicPlayerOptions` | 支持 Proxy 的配置对象 |
+
+### 配置管理
+
+```javascript
+const player = new MusicPlayer({ volume: 0.8, mode: PlayMode.SEQUENTIAL });
+
+// 直接修改属性可以工作
+player.config.enable = false;  // 立即停止播放
+player.config.volume = 0.5;  // 立即应用到音频
+player.config.mode = PlayMode.SHUFFLE;  // 自动重建随机顺序
+player.config.stopOnHidden = true;  // 自动设置监听器
+
+// 批量更新
+player.config = {
+  volume: 0.6,
+  mode: PlayMode.LOOP,
+  fadeIn: 500,
+  fadeOut: 500
+};
+```
+
+**自动处理的配置变更：**
+- `enable`: 设为 `false` 时停止播放
+- `volume`: 立即应用到当前音频
+- `rate`: 立即应用到当前音频
+- `loop`: 立即应用到当前音频
+- `mode`: 设为 `SHUFFLE` 时重建随机顺序
+- `stopOnHidden`: 自动设置/移除可见性监听器
 
 ### 播放列表访问
 
@@ -451,3 +546,5 @@ player.on('error', (error) => {
 4. **处理页面可见性** - 使用 `stopOnHidden` 获得更好的移动端体验
 5. **淡入淡出效果** - 使用淡入淡出实现平滑过渡
 6. **事件监听器** - 组件卸载时移除监听器
+7. **使用 Proxy 配置** - 现在支持直接属性修改 (`config.enable = false`)
+8. **批量更新** - 一次性使用对象赋值进行多个配置更改

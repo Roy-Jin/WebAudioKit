@@ -258,10 +258,10 @@
     };
 
     // ── BGM 初始化 ────────────────────────────────────────
-    const bgm = new BGM({ volume: 0.6, loop: true, fadeIn: 800, fadeOut: 600, stopOnHidden: true });
+    window.bgm = new BGM({ volume: 0.6, loop: true, fadeIn: 800, fadeOut: 600, stopOnHidden: true });
 
     // ── SFX 初始化 ────────────────────────────────────────
-    const sfx = new SFX({ volume: 0.7, stopOnHidden: true });
+    window.sfx = new SFX({ volume: 0.7, stopOnHidden: true });
 
     // ── 加载资源 ──────────────────────────────────────────
     $('loading-text').textContent = '正在加载音频资源...';

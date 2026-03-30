@@ -62,7 +62,33 @@ class SFX {
         if (options.enable !== undefined) {
             this.Config.enable = options.enable;
         }
+        this.configProxy = this.createConfigProxy();
         this.setupVisibilityHandler();
+    }
+    createConfigProxy() {
+        return new Proxy(this.Config, {
+            set: (target, prop, value) => {
+                const oldValue = target[prop];
+                target[prop] = value;
+                // 处理配置变更
+                this.handleConfigChange(prop, value, oldValue);
+                return true;
+            }
+        });
+    }
+    handleConfigChange(key, newValue, oldValue) {
+        if (newValue === oldValue)
+            return;
+        switch (key) {
+            case 'enable':
+                if (newValue === false) {
+                    this.stopAll();
+                }
+                break;
+            case 'stopOnHidden':
+                this.setupVisibilityHandler();
+                break;
+        }
     }
     setupVisibilityHandler() {
         // 清理旧的监听器
@@ -89,8 +115,7 @@ class SFX {
      */
     load(id, src) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.Config.enable)
-                return;
+            // load 操作不受 enable 限制，允许预加载资源
             if (!this.Config.preload) {
                 // 非预加载模式：仅缓存 src，不触发网络请求
                 this.Cache.set(id, src);
@@ -124,7 +149,10 @@ class SFX {
     play(id_1) {
         return __awaiter(this, arguments, void 0, function* (id, options = {}) {
             var _a;
-            if (!this.Config.enable || this.blocked)
+            if (!this.Config.enable) {
+                return;
+            }
+            if (this.blocked)
                 return;
             const src = (_a = options.src) !== null && _a !== void 0 ? _a : this.Cache.get(id);
             if (!src) {
@@ -169,8 +197,6 @@ class SFX {
      * 停止所有正在播放的音效实例
      */
     stopAll() {
-        if (!this.Config.enable)
-            return;
         this.ActiveInstances.forEach(instance => instance.stop());
         this.ActiveInstances.clear();
     }
@@ -178,8 +204,6 @@ class SFX {
      * 停止指定 id 的所有音效实例
      */
     stop(id) {
-        if (!this.Config.enable)
-            return;
         this.ActiveInstances.forEach(instance => {
             if (instance.id === id) {
                 instance.stop();
@@ -193,14 +217,16 @@ class SFX {
     get activeCount() {
         return this.ActiveInstances.size;
     }
-    get enable() { return this.Config.enable; }
-    set enable(value) { this.Config.enable = value; }
-    get config() { return Object.assign({}, this.Config); }
+    get config() {
+        return this.configProxy;
+    }
     set config(newConfig) {
-        this.Config = Object.assign(Object.assign({}, this.Config), newConfig);
-        // 如果 stopOnHidden 改变，重新设置监听器
-        if (newConfig.stopOnHidden !== undefined)
-            this.setupVisibilityHandler();
+        Object.keys(newConfig).forEach(key => {
+            const k = key;
+            if (newConfig[k] !== undefined) {
+                this.configProxy[k] = newConfig[k];
+            }
+        });
     }
     destroy() {
         this.stopAll();
@@ -234,7 +260,7 @@ class BGM {
             fade: false,
             preload: false,
             stopOnHidden: false,
-            enable: true
+            enable: true,
         };
         this.Cache = new Map();
         this.audio = null;
@@ -244,26 +270,71 @@ class BGM {
         this.pausedByHidden = false;
         this.visibilityHandler = null;
         this.eventListeners = new Map();
-        if (options.volume !== undefined)
+        if (options.volume !== undefined) {
             this.Config.volume = Math.max(0, Math.min(1, options.volume));
+        }
         if (options.rate !== undefined)
             this.Config.rate = options.rate;
         if (options.loop !== undefined)
             this.Config.loop = options.loop;
-        if (options.stopOnHidden !== undefined)
+        if (options.stopOnHidden !== undefined) {
             this.Config.stopOnHidden = options.stopOnHidden;
+        }
         if (options.preload !== undefined)
             this.Config.preload = options.preload;
         if (options.enable !== undefined)
             this.Config.enable = options.enable;
         this.Config.fadeIn = resolveFadeMs$1(options.fade, options.fadeIn);
         this.Config.fadeOut = resolveFadeMs$1(options.fade, options.fadeOut);
+        this.configProxy = this.createConfigProxy();
         this.setupVisibilityHandler();
+    }
+    createConfigProxy() {
+        return new Proxy(this.Config, {
+            set: (target, prop, value) => {
+                const oldValue = target[prop];
+                target[prop] = value;
+                // 处理配置变更
+                this.handleConfigChange(prop, value, oldValue);
+                return true;
+            }
+        });
+    }
+    handleConfigChange(key, newValue, oldValue) {
+        if (newValue === oldValue)
+            return;
+        switch (key) {
+            case 'enable':
+                if (newValue === false) {
+                    this.clearFade();
+                    this.stop();
+                }
+                break;
+            case 'volume':
+                if (this.audio) {
+                    this.audio.volume = Math.max(0, Math.min(1, newValue));
+                    this.emit('volumechange', newValue);
+                }
+                break;
+            case 'rate':
+                if (this.audio) {
+                    this.audio.playbackRate = newValue;
+                }
+                break;
+            case 'loop':
+                if (this.audio) {
+                    this.audio.loop = newValue;
+                }
+                break;
+            case 'stopOnHidden':
+                this.setupVisibilityHandler();
+                break;
+        }
     }
     setupVisibilityHandler() {
         // 清理旧的监听器
         if (this.visibilityHandler) {
-            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            document.removeEventListener("visibilitychange", this.visibilityHandler);
             this.visibilityHandler = null;
         }
         // 如果启用 stopOnHidden，设置新的监听器
@@ -285,13 +356,12 @@ class BGM {
                     }
                 }
             };
-            document.addEventListener('visibilitychange', this.visibilityHandler);
+            document.addEventListener("visibilitychange", this.visibilityHandler);
         }
     }
     load(id, src) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.Config.enable)
-                return;
+            // load 操作不受 enable 限制，允许预加载资源
             if (!this.Config.preload) {
                 // 非预加载模式：仅缓存 src
                 this.Cache.set(id, src);
@@ -299,17 +369,23 @@ class BGM {
             }
             return new Promise((resolve, reject) => {
                 const audio = new Audio(src);
-                const onLoad = () => { this.Cache.set(id, src); resolve(); };
+                const onLoad = () => {
+                    this.Cache.set(id, src);
+                    resolve();
+                };
                 const onError = (e) => reject(e);
-                audio.addEventListener('canplaythrough', onLoad, { once: true });
-                audio.addEventListener('error', onError, { once: true });
+                audio.addEventListener("canplaythrough", onLoad, { once: true });
+                audio.addEventListener("error", onError, { once: true });
                 audio.load();
             });
         });
     }
     play(id) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.Config.enable || this.blocked)
+            if (!this.Config.enable) {
+                return;
+            }
+            if (this.blocked)
                 return;
             const src = this.Cache.get(id);
             if (!src)
@@ -334,73 +410,90 @@ class BGM {
         });
     }
     pause() {
-        if (!this.Config.enable || !this.audio)
+        if (!this.audio)
             return;
         this.clearFade();
         this.audio.pause();
     }
     resume() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.Config.enable || this.blocked || !this.audio || !this.audio.paused)
+            if (!this.Config.enable) {
+                return;
+            }
+            if (this.blocked || !this.audio || !this.audio.paused)
                 return;
             yield this.resumePlay();
         });
     }
     stop() {
-        if (!this.Config.enable)
-            return;
         this.clearFade();
         this.stopCurrent();
         this.pausedByHidden = false;
     }
-    get volume() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.volume) !== null && _b !== void 0 ? _b : this.Config.volume; }
+    get volume() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.volume) !== null && _b !== void 0 ? _b : this.Config.volume;
+    }
     set volume(value) {
         const vol = Math.max(0, Math.min(1, value));
         this.Config.volume = vol;
         if (this.audio) {
             this.audio.volume = vol;
-            this.emit('volumechange', vol);
+            this.emit("volumechange", vol);
         }
     }
-    get rate() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.playbackRate) !== null && _b !== void 0 ? _b : this.Config.rate; }
+    get rate() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.playbackRate) !== null && _b !== void 0 ? _b : this.Config.rate;
+    }
     set rate(value) {
         this.Config.rate = value;
         if (this.audio)
             this.audio.playbackRate = value;
     }
-    get loop() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.loop) !== null && _b !== void 0 ? _b : this.Config.loop; }
+    get loop() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.loop) !== null && _b !== void 0 ? _b : this.Config.loop;
+    }
     set loop(value) {
         this.Config.loop = value;
         if (this.audio)
             this.audio.loop = value;
     }
-    get currentTime() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.currentTime) !== null && _b !== void 0 ? _b : 0; }
-    set currentTime(value) { if (this.audio)
-        this.audio.currentTime = value; }
-    get duration() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.duration) !== null && _b !== void 0 ? _b : 0; }
-    get paused() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.paused) !== null && _b !== void 0 ? _b : true; }
-    get playing() { return this.currentId; }
-    get enable() { return this.Config.enable; }
-    set enable(value) { this.Config.enable = value; }
-    get config() { return Object.assign({}, this.Config); }
+    get currentTime() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.currentTime) !== null && _b !== void 0 ? _b : 0;
+    }
+    set currentTime(value) {
+        if (this.audio)
+            this.audio.currentTime = value;
+    }
+    get duration() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.duration) !== null && _b !== void 0 ? _b : 0;
+    }
+    get paused() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.paused) !== null && _b !== void 0 ? _b : true;
+    }
+    get playing() {
+        return this.currentId;
+    }
+    get config() {
+        return this.configProxy;
+    }
     set config(newConfig) {
-        this.Config = Object.assign(Object.assign({}, this.Config), newConfig);
-        // 应用新配置到当前播放的音频
-        if (this.audio) {
-            if (newConfig.volume !== undefined)
-                this.audio.volume = Math.max(0, Math.min(1, newConfig.volume));
-            if (newConfig.rate !== undefined)
-                this.audio.playbackRate = newConfig.rate;
-            if (newConfig.loop !== undefined)
-                this.audio.loop = newConfig.loop;
-        }
-        // 如果 stopOnHidden 改变，重新设置监听器
-        if (newConfig.stopOnHidden !== undefined)
-            this.setupVisibilityHandler();
+        Object.keys(newConfig).forEach(key => {
+            const k = key;
+            if (newConfig[k] !== undefined) {
+                this.configProxy[k] = newConfig[k];
+            }
+        });
     }
     on(event, listener) {
-        if (!this.eventListeners.has(event))
+        if (!this.eventListeners.has(event)) {
             this.eventListeners.set(event, new Set());
+        }
         this.eventListeners.get(event).add(listener);
     }
     off(event, listener) {
@@ -412,7 +505,7 @@ class BGM {
         this.stopCurrent();
         this.Cache.clear();
         if (this.visibilityHandler) {
-            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            document.removeEventListener("visibilitychange", this.visibilityHandler);
             this.visibilityHandler = null;
         }
         this.eventListeners.clear();
@@ -422,23 +515,27 @@ class BGM {
             return;
         this.audio.pause();
         this.audio.currentTime = 0;
-        this.audio.src = '';
+        this.audio.src = "";
         this.audio.load();
         this.audio = null;
         this.currentId = null;
-        this.emit('stop');
+        this.emit("stop");
     }
     setupAudioEvents() {
         if (!this.audio)
             return;
-        this.audio.addEventListener('play', () => this.emit('play'));
-        this.audio.addEventListener('pause', () => this.emit('pause'));
-        this.audio.addEventListener('ended', () => this.emit('ended'));
-        this.audio.addEventListener('timeupdate', () => this.emit('timeupdate', {
-            currentTime: this.audio.currentTime,
-            duration: this.audio.duration
-        }));
-        this.audio.addEventListener('error', (e) => this.emit('error', e));
+        this.audio.addEventListener("play", () => this.emit("play"));
+        this.audio.addEventListener("pause", () => this.emit("pause"));
+        this.audio.addEventListener("ended", () => this.emit("ended"));
+        this.audio.addEventListener("timeupdate", () => {
+            if (!this.audio)
+                return;
+            this.emit("timeupdate", {
+                currentTime: this.audio.currentTime,
+                duration: this.audio.duration,
+            });
+        });
+        this.audio.addEventListener("error", (e) => this.emit("error", e));
     }
     resumePlay() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -451,7 +548,7 @@ class BGM {
                     yield this.audio.play();
             }
             catch (error) {
-                this.emit('error', error);
+                this.emit("error", error);
             }
         });
     }
@@ -465,7 +562,7 @@ class BGM {
                     yield this.audio.play();
                 }
                 catch (e) {
-                    this.emit('error', e);
+                    this.emit("error", e);
                     throw e;
                 }
                 return;
@@ -476,7 +573,7 @@ class BGM {
                 yield this.audio.play();
             }
             catch (e) {
-                this.emit('error', e);
+                this.emit("error", e);
                 throw e;
             }
             return new Promise((resolve) => {
@@ -535,7 +632,7 @@ class BGM {
     }
     emit(event, data) {
         var _a;
-        (_a = this.eventListeners.get(event)) === null || _a === void 0 ? void 0 : _a.forEach(listener => listener(data));
+        (_a = this.eventListeners.get(event)) === null || _a === void 0 ? void 0 : _a.forEach((listener) => listener(data));
     }
 }
 
@@ -836,24 +933,39 @@ class Music {
         this.src = src;
         this.metadata = metadata;
         this.lrcUrl = lrcUrl;
+        this.metadataProxy = this.createMetadataProxy();
         // 如果直接传了 lrc 文本，立即解析
         if (this.metadata.lrc) {
             this.lyrics = Music.parseLyrics(this.metadata.lrc);
             this.lrcLoaded = true;
         }
     }
+    createMetadataProxy() {
+        return new Proxy(this.metadata, {
+            set: (target, prop, value) => {
+                target[prop] = value;
+                // 如果修改了 lrc，重新解析歌词
+                if (prop === 'lrc' && value) {
+                    this.lyrics = Music.parseLyrics(value);
+                    this.lrcLoaded = true;
+                }
+                return true;
+            }
+        });
+    }
     get url() {
         return this.src;
     }
     get meta() {
-        return Object.assign({}, this.metadata);
+        return this.metadataProxy;
     }
     set meta(data) {
-        this.metadata = Object.assign(Object.assign({}, this.metadata), data);
-        if (data.lrc) {
-            this.lyrics = Music.parseLyrics(data.lrc);
-            this.lrcLoaded = true;
-        }
+        Object.keys(data).forEach(key => {
+            const k = key;
+            if (data[k] !== undefined) {
+                this.metadataProxy[k] = data[k];
+            }
+        });
     }
     /**
      * 懒加载歌词，播放时调用，已加载则直接返回
@@ -867,7 +979,7 @@ class Music {
                 this.lyrics = Music.parseLyrics(text);
             }
             catch (_a) {
-                console.warn(`Failed to fetch lyrics: ${this.metadata.title}`);
+                // Silently fail if lyrics cannot be fetched
             }
             this.lrcLoaded = true;
         });
@@ -898,8 +1010,7 @@ class Music {
             const lrc = Lrc.parse(text);
             return lrc.lyrics.map(line => ({ time: line.timestamp, text: line.content }));
         }
-        catch (error) {
-            console.warn('Failed to parse lyrics:', error);
+        catch (_a) {
             return [];
         }
     }
@@ -983,7 +1094,55 @@ class MusicPlayer {
             this.Config.preload = options.preload;
         if (options.stopOnHidden !== undefined)
             this.Config.stopOnHidden = options.stopOnHidden;
+        this.configProxy = this.createConfigProxy();
         this.setupVisibilityHandler();
+    }
+    createConfigProxy() {
+        return new Proxy(this.Config, {
+            set: (target, prop, value) => {
+                const oldValue = target[prop];
+                target[prop] = value;
+                // 处理配置变更
+                this.handleConfigChange(prop, value, oldValue);
+                return true;
+            }
+        });
+    }
+    handleConfigChange(key, newValue, oldValue) {
+        if (newValue === oldValue)
+            return;
+        switch (key) {
+            case 'enable':
+                if (newValue === false) {
+                    this.clearFade();
+                    this.stop();
+                }
+                break;
+            case 'volume':
+                if (this.audio) {
+                    this.audio.volume = Math.max(0, Math.min(1, newValue));
+                    this.emit('volumechange', newValue);
+                }
+                break;
+            case 'rate':
+                if (this.audio) {
+                    this.audio.playbackRate = newValue;
+                }
+                break;
+            case 'loop':
+                if (this.audio) {
+                    this.audio.loop = newValue;
+                }
+                break;
+            case 'mode':
+                if (newValue === PlayMode.SHUFFLE) {
+                    this.rebuildShuffle();
+                }
+                break;
+            case 'stopOnHidden':
+                this.setupVisibilityHandler();
+                break;
+        }
     }
     setupVisibilityHandler() {
         // 清理旧的监听器
@@ -1063,7 +1222,10 @@ class MusicPlayer {
     // ==================== 播放控制 ====================
     play(idx) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.Config.enable || this.blocked)
+            if (!this.Config.enable) {
+                return;
+            }
+            if (this.blocked)
                 return;
             if (idx !== undefined) {
                 yield this.loadAt(idx);
@@ -1087,26 +1249,29 @@ class MusicPlayer {
         });
     }
     pause() {
-        if (!this.Config.enable || !this.audio)
+        if (!this.audio)
             return;
         this.clearFade();
         this.pausedByHidden = false;
         this.audio.pause();
     }
     stop() {
-        if (!this.Config.enable || !this.audio)
+        if (!this.audio)
             return;
         this.clearFade();
         this.pausedByHidden = false;
         this.audio.pause();
         this.audio.currentTime = 0;
+        this.audio.src = '';
+        this.audio.load();
         this._state = PlayState.STOPPED;
         this.emit('stop');
     }
     playNext() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.Config.enable)
+            if (!this.Config.enable) {
                 return;
+            }
             const nextIdx = this.resolveNext();
             if (nextIdx === null)
                 return;
@@ -1115,8 +1280,9 @@ class MusicPlayer {
     }
     playPrev() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.Config.enable)
+            if (!this.Config.enable) {
                 return;
+            }
             const prevIdx = this.resolvePrev();
             if (prevIdx === null)
                 return;
@@ -1163,7 +1329,7 @@ class MusicPlayer {
             this.emit('musicchange', music);
             // 歌词懒加载，不阻塞播放
             music.loadLyrics().catch(() => { });
-            if (!this.blocked) {
+            if (!this.blocked && this.Config.enable) {
                 try {
                     yield this.execFadeIn(this.audio);
                 }
@@ -1194,6 +1360,8 @@ class MusicPlayer {
             this.handleEnded();
         });
         this.audio.addEventListener('timeupdate', () => {
+            if (!this.audio)
+                return;
             this.emit('timeupdate', { currentTime: this.audio.currentTime, duration: this.audio.duration });
             this.updateLyric();
         });
@@ -1204,6 +1372,11 @@ class MusicPlayer {
     }
     handleEnded() {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!this.Config.enable) {
+                this._state = PlayState.STOPPED;
+                this.emit('stop');
+                return;
+            }
             const nextIdx = this.resolveNext();
             if (nextIdx !== null) {
                 yield this.loadAt(nextIdx);
@@ -1363,26 +1536,16 @@ class MusicPlayer {
         if (value === PlayMode.SHUFFLE)
             this.rebuildShuffle();
     }
-    get enable() { return this.Config.enable; }
-    set enable(value) { this.Config.enable = value; }
-    get config() { return Object.assign({}, this.Config); }
+    get config() {
+        return this.configProxy;
+    }
     set config(newConfig) {
-        this.Config = Object.assign(Object.assign({}, this.Config), newConfig);
-        // 应用新配置到当前播放的音频
-        if (this.audio) {
-            if (newConfig.volume !== undefined)
-                this.audio.volume = Math.max(0, Math.min(1, newConfig.volume));
-            if (newConfig.rate !== undefined)
-                this.audio.playbackRate = newConfig.rate;
-            if (newConfig.loop !== undefined)
-                this.audio.loop = newConfig.loop;
-        }
-        // 如果播放模式改为随机，重建随机顺序
-        if (newConfig.mode === PlayMode.SHUFFLE)
-            this.rebuildShuffle();
-        // 如果 stopOnHidden 改变，重新设置监听器
-        if (newConfig.stopOnHidden !== undefined)
-            this.setupVisibilityHandler();
+        Object.keys(newConfig).forEach(key => {
+            const k = key;
+            if (newConfig[k] !== undefined) {
+                this.configProxy[k] = newConfig[k];
+            }
+        });
     }
     get lyric() {
         const music = this.current;

@@ -13,6 +13,7 @@ export class SFX {
     preload: false,
     enable: true
   };
+  private configProxy: SFXOptions;
   private ActiveInstances: Set<SFXInstance> = new Set();
   private Cache: Map<string, string> = new Map(); // id -> src
   private visibilityHandler: (() => void) | null = null;
@@ -35,7 +36,36 @@ export class SFX {
       this.Config.enable = options.enable;
     }
 
+    this.configProxy = this.createConfigProxy();
     this.setupVisibilityHandler();
+  }
+
+  private createConfigProxy(): SFXOptions {
+    return new Proxy(this.Config, {
+      set: (target, prop: string, value) => {
+        const oldValue = target[prop as keyof SFXOptions];
+        (target as any)[prop] = value;
+
+        // 处理配置变更
+        this.handleConfigChange(prop as keyof SFXOptions, value, oldValue);
+        return true;
+      }
+    });
+  }
+
+  private handleConfigChange(key: keyof SFXOptions, newValue: any, oldValue: any): void {
+    if (newValue === oldValue) return;
+
+    switch (key) {
+      case 'enable':
+        if (newValue === false) {
+          this.stopAll();
+        }
+        break;
+      case 'stopOnHidden':
+        this.setupVisibilityHandler();
+        break;
+    }
   }
 
   private setupVisibilityHandler(): void {
@@ -63,7 +93,7 @@ export class SFX {
    * 预加载音效资源（preload: true 时建议提前调用；preload: false 时可跳过）
    */
   async load(id: string, src: string): Promise<void> {
-    if (!this.Config.enable) return;
+    // load 操作不受 enable 限制，允许预加载资源
     if (!this.Config.preload) {
       // 非预加载模式：仅缓存 src，不触发网络请求
       this.Cache.set(id, src);
@@ -95,7 +125,10 @@ export class SFX {
    * preload: false 时可直接传 src 而无需提前调用 load()
    */
   async play(id: string, options: SFXOptions & { src?: string } = {}): Promise<void> {
-    if (!this.Config.enable || this.blocked) return;
+    if (!this.Config.enable) {
+      return;
+    }
+    if (this.blocked) return;
 
     const src = options.src ?? this.Cache.get(id);
     if (!src) {
@@ -145,7 +178,6 @@ export class SFX {
    * 停止所有正在播放的音效实例
    */
   stopAll(): void {
-    if (!this.Config.enable) return;
     this.ActiveInstances.forEach(instance => instance.stop());
     this.ActiveInstances.clear();
   }
@@ -154,7 +186,6 @@ export class SFX {
    * 停止指定 id 的所有音效实例
    */
   stop(id: string): void {
-    if (!this.Config.enable) return;
     this.ActiveInstances.forEach(instance => {
       if (instance.id === id) {
         instance.stop();
@@ -170,14 +201,16 @@ export class SFX {
     return this.ActiveInstances.size;
   }
 
-  get enable(): boolean { return this.Config.enable!; }
-  set enable(value: boolean) { this.Config.enable = value; }
-
-  get config(): SFXOptions { return { ...this.Config }; }
+  get config(): SFXOptions { 
+    return this.configProxy; 
+  }
   set config(newConfig: Partial<SFXOptions>) {
-    this.Config = { ...this.Config, ...newConfig };
-    // 如果 stopOnHidden 改变，重新设置监听器
-    if (newConfig.stopOnHidden !== undefined) this.setupVisibilityHandler();
+    Object.keys(newConfig).forEach(key => {
+      const k = key as keyof SFXOptions;
+      if (newConfig[k] !== undefined) {
+        (this.configProxy as any)[k] = newConfig[k];
+      }
+    });
   }
 
   destroy(): void {

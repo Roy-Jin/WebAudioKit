@@ -26,6 +26,7 @@ export class MusicPlayer {
     mode: PlayMode.SEQUENTIAL,
     enable: true
   };
+  private configProxy: MusicPlayerOptions;
 
   private audio: HTMLAudioElement | null = null;
   private eventListeners: Map<EventType, Set<EventListener>> = new Map();
@@ -54,7 +55,58 @@ export class MusicPlayer {
     if (options.preload !== undefined) this.Config.preload = options.preload;
     if (options.stopOnHidden !== undefined) this.Config.stopOnHidden = options.stopOnHidden;
 
+    this.configProxy = this.createConfigProxy();
     this.setupVisibilityHandler();
+  }
+
+  private createConfigProxy(): MusicPlayerOptions {
+    return new Proxy(this.Config, {
+      set: (target, prop: string, value) => {
+        const oldValue = target[prop as keyof MusicPlayerOptions];
+        (target as any)[prop] = value;
+
+        // 处理配置变更
+        this.handleConfigChange(prop as keyof MusicPlayerOptions, value, oldValue);
+        return true;
+      }
+    });
+  }
+
+  private handleConfigChange(key: keyof MusicPlayerOptions, newValue: any, oldValue: any): void {
+    if (newValue === oldValue) return;
+
+    switch (key) {
+      case 'enable':
+        if (newValue === false) {
+          this.clearFade();
+          this.stop();
+        }
+        break;
+      case 'volume':
+        if (this.audio) {
+          this.audio.volume = Math.max(0, Math.min(1, newValue));
+          this.emit('volumechange', newValue);
+        }
+        break;
+      case 'rate':
+        if (this.audio) {
+          this.audio.playbackRate = newValue;
+        }
+        break;
+      case 'loop':
+        if (this.audio) {
+          this.audio.loop = newValue;
+        }
+        break;
+      case 'mode':
+        if (newValue === PlayMode.SHUFFLE) {
+          this.rebuildShuffle();
+        }
+        break;
+      case 'stopOnHidden':
+        this.setupVisibilityHandler();
+        break;
+    }
   }
 
   private setupVisibilityHandler(): void {
@@ -135,7 +187,10 @@ export class MusicPlayer {
   // ==================== 播放控制 ====================
 
   async play(idx?: number): Promise<void> {
-    if (!this.Config.enable || this.blocked) return;
+    if (!this.Config.enable) {
+      return;
+    }
+    if (this.blocked) return;
 
     if (idx !== undefined) {
       await this.loadAt(idx);
@@ -159,31 +214,37 @@ export class MusicPlayer {
   }
 
   pause(): void {
-    if (!this.Config.enable || !this.audio) return;
+    if (!this.audio) return;
     this.clearFade();
     this.pausedByHidden = false;
     this.audio.pause();
   }
 
   stop(): void {
-    if (!this.Config.enable || !this.audio) return;
+    if (!this.audio) return;
     this.clearFade();
     this.pausedByHidden = false;
     this.audio.pause();
     this.audio.currentTime = 0;
+    this.audio.src = '';
+    this.audio.load();
     this._state = PlayState.STOPPED;
     this.emit('stop');
   }
 
   async playNext(): Promise<void> {
-    if (!this.Config.enable) return;
+    if (!this.Config.enable) {
+      return;
+    }
     const nextIdx = this.resolveNext();
     if (nextIdx === null) return;
     await this.loadAt(nextIdx);
   }
 
   async playPrev(): Promise<void> {
-    if (!this.Config.enable) return;
+    if (!this.Config.enable) {
+      return;
+    }
     const prevIdx = this.resolvePrev();
     if (prevIdx === null) return;
     await this.loadAt(prevIdx);
@@ -232,7 +293,7 @@ export class MusicPlayer {
     // 歌词懒加载，不阻塞播放
     music.loadLyrics().catch(() => {});
 
-    if (!this.blocked) {
+    if (!this.blocked && this.Config.enable) {
       try {
         await this.execFadeIn(this.audio);
       } catch (error) {
@@ -261,7 +322,8 @@ export class MusicPlayer {
       this.handleEnded();
     });
     this.audio.addEventListener('timeupdate', () => {
-      this.emit('timeupdate', { currentTime: this.audio!.currentTime, duration: this.audio!.duration });
+      if (!this.audio) return;
+      this.emit('timeupdate', { currentTime: this.audio.currentTime, duration: this.audio.duration });
       this.updateLyric();
     });
     this.audio.addEventListener('error', (e) => {
@@ -271,6 +333,11 @@ export class MusicPlayer {
   }
 
   private async handleEnded(): Promise<void> {
+    if (!this.Config.enable) {
+      this._state = PlayState.STOPPED;
+      this.emit('stop');
+      return;
+    }
     const nextIdx = this.resolveNext();
     if (nextIdx !== null) {
       await this.loadAt(nextIdx);
@@ -450,25 +517,16 @@ export class MusicPlayer {
     if (value === PlayMode.SHUFFLE) this.rebuildShuffle();
   }
 
-  get enable(): boolean { return this.Config.enable!; }
-  set enable(value: boolean) { this.Config.enable = value; }
-
-  get config(): MusicPlayerOptions { return { ...this.Config }; }
+  get config(): MusicPlayerOptions { 
+    return this.configProxy; 
+  }
   set config(newConfig: Partial<MusicPlayerOptions>) {
-    this.Config = { ...this.Config, ...newConfig };
-    
-    // 应用新配置到当前播放的音频
-    if (this.audio) {
-      if (newConfig.volume !== undefined) this.audio.volume = Math.max(0, Math.min(1, newConfig.volume));
-      if (newConfig.rate !== undefined) this.audio.playbackRate = newConfig.rate;
-      if (newConfig.loop !== undefined) this.audio.loop = newConfig.loop;
-    }
-    
-    // 如果播放模式改为随机，重建随机顺序
-    if (newConfig.mode === PlayMode.SHUFFLE) this.rebuildShuffle();
-    
-    // 如果 stopOnHidden 改变，重新设置监听器
-    if (newConfig.stopOnHidden !== undefined) this.setupVisibilityHandler();
+    Object.keys(newConfig).forEach(key => {
+      const k = key as keyof MusicPlayerOptions;
+      if (newConfig[k] !== undefined) {
+        (this.configProxy as any)[k] = newConfig[k];
+      }
+    });
   }
 
   get lyric(): Lyric | null {

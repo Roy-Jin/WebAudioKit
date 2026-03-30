@@ -1,6 +1,6 @@
 # Usage Guide
 
-[![npm version](https://img.shields.io/npm/v/webaudiokit.svg)](https://www.npmjs.com/package/webaudiokit)
+[![npm version](https://img.shields.io/badge/npm-webaudiokit-blue.svg)](https://www.npmjs.com/package/webaudiokit)
 
 [English](USAGE.md) | [中文](USAGE_zh.md)
 
@@ -9,19 +9,20 @@ Comprehensive usage guide with practical examples for WebAudioKit.
 ## Table of Contents
 
 - [Installation & Setup](#installation--setup)
+- [Quick Start](#quick-start)
+- [Configuration Management](#configuration-management)
 - [BGM Examples](#bgm-examples)
 - [SFX Examples](#sfx-examples)
 - [Music Player Examples](#music-player-examples)
 - [Advanced Patterns](#advanced-patterns)
-- [Integration Examples](#integration-examples)
-- [Performance Tips](#performance-tips)
-- [Troubleshooting](#troubleshooting)
+- [Framework Integration](#framework-integration)
+- [Best Practices](#best-practices)
 
 ---
 
 ## Installation & Setup
 
-### Basic Installation
+### NPM Installation
 
 ```bash
 npm install webaudiokit
@@ -49,29 +50,188 @@ const { BGM, SFX, MusicPlayer, Music, PlayMode } = require('webaudiokit');
 
 ---
 
-## BGM Examples
+## Quick Start
 
-### Basic Background Music
+### Background Music (BGM)
 
 ```javascript
 import { BGM } from 'webaudiokit';
 
 const bgm = new BGM({
-  volume: 0.6,
+  volume: 0.7,
   loop: true,
   fadeIn: 1000,
   fadeOut: 800
 });
 
-// Load multiple tracks
-await bgm.load('menu', 'audio/menu-music.mp3');
-await bgm.load('game', 'audio/game-music.mp3');
-await bgm.load('victory', 'audio/victory-music.mp3');
-
-// Play with smooth transitions
+// Load and play
+await bgm.load('menu', 'audio/menu.mp3');
 await bgm.play('menu');
+
+// Control playback
+bgm.pause();
+await bgm.resume();
+bgm.stop();
 ```
-### Game State Music Management
+
+### Sound Effects (SFX)
+
+```javascript
+import { SFX } from 'webaudiokit';
+
+const sfx = new SFX({ volume: 0.8 });
+
+// Load and play
+await sfx.load('click', 'audio/click.wav');
+await sfx.play('click');
+
+// Play with custom options
+await sfx.play('click', { volume: 0.5, rate: 1.2 });
+
+// Play without preloading
+await sfx.play('newSound', { src: 'audio/new.wav' });
+```
+
+### Music Player
+
+```javascript
+import { MusicPlayer, Music, PlayMode } from 'webaudiokit';
+
+const player = new MusicPlayer({
+  volume: 0.8,
+  mode: PlayMode.SHUFFLE,
+  fadeIn: 500,
+  fadeOut: 500
+});
+
+// Add tracks
+const music = new Music('song.mp3', {
+  title: 'My Song',
+  artist: 'Artist Name',
+  cover: 'cover.jpg'
+}, 'lyrics.lrc');
+
+player.add(music);
+
+// Control playback
+await player.play();
+player.pause();
+await player.playNext();
+await player.playPrev();
+```
+
+---
+
+## Configuration Management
+
+### Proxy-Based Configuration
+
+All classes now support direct property modification using Proxy:
+
+```javascript
+const bgm = new BGM({ volume: 0.7, loop: true });
+
+// ✅ Direct property modification (NEW!)
+bgm.config.enable = false;  // Stops playback immediately
+bgm.config.volume = 0.5;    // Applied to audio immediately
+bgm.config.stopOnHidden = true;  // Listener setup automatically
+
+// ✅ Object assignment (still works)
+bgm.config = {
+  volume: 0.6,
+  fadeIn: 1500,
+  stopOnHidden: true
+};
+
+// ✅ Get current config
+const currentConfig = bgm.config;
+console.log(currentConfig.volume); // 0.6
+```
+
+### Enable/Disable Control
+
+```javascript
+const bgm = new BGM();
+const sfx = new SFX();
+const player = new MusicPlayer();
+
+// Start playing
+await bgm.play('menu');
+await player.play();
+
+// Disable - stops playback and blocks all methods
+bgm.config.enable = false;      // Stops BGM
+sfx.config.enable = false;      // Stops all SFX instances
+player.config.enable = false;   // Stops music
+
+// Re-enable
+bgm.config.enable = true;
+await bgm.play('menu');  // Works again
+```
+
+### Settings Panel Example
+
+```javascript
+class AudioSettings {
+  constructor() {
+    this.bgm = new BGM();
+    this.sfx = new SFX();
+    this.player = new MusicPlayer();
+    this.loadSettings();
+  }
+  
+  // Apply user settings
+  applySettings(settings) {
+    // BGM settings
+    this.bgm.config = {
+      enable: settings.bgmEnabled,
+      volume: settings.bgmVolume,
+      stopOnHidden: settings.pauseWhenHidden
+    };
+    
+    // SFX settings
+    this.sfx.config = {
+      enable: settings.sfxEnabled,
+      volume: settings.sfxVolume
+    };
+    
+    // Music player settings
+    this.player.config = {
+      enable: settings.musicEnabled,
+      volume: settings.musicVolume,
+      mode: settings.playMode,
+      fadeIn: settings.enableFade ? 500 : 0,
+      fadeOut: settings.enableFade ? 500 : 0
+    };
+  }
+  
+  // Save to localStorage
+  saveSettings() {
+    localStorage.setItem('audio-settings', JSON.stringify({
+      bgm: this.bgm.config,
+      sfx: this.sfx.config,
+      player: this.player.config
+    }));
+  }
+  
+  // Load from localStorage
+  loadSettings() {
+    const saved = localStorage.getItem('audio-settings');
+    if (saved) {
+      const settings = JSON.parse(saved);
+      this.bgm.config = settings.bgm;
+      this.sfx.config = settings.sfx;
+      this.player.config = settings.player;
+    }
+  }
+}
+```
+
+---
+
+## BGM Examples
+
+### Game State Music
 
 ```javascript
 class GameAudioManager {
@@ -83,16 +243,20 @@ class GameAudioManager {
       stopOnHidden: true
     });
     
-    this.loadGameMusic();
+    this.loadMusic();
   }
   
-  async loadGameMusic() {
+  async loadMusic() {
     await Promise.all([
       this.bgm.load('menu', 'audio/menu.mp3'),
       this.bgm.load('gameplay', 'audio/gameplay.mp3'),
       this.bgm.load('boss', 'audio/boss-battle.mp3'),
       this.bgm.load('victory', 'audio/victory.mp3')
     ]);
+  }
+  
+  async switchToMenu() {
+    await this.bgm.play('menu');
   }
   
   async switchToGameplay() {
@@ -106,18 +270,23 @@ class GameAudioManager {
   async showVictory() {
     await this.bgm.play('victory');
   }
+  
+  // Dynamic volume control
+  setVolume(volume) {
+    this.bgm.config.volume = volume;
+  }
+  
+  // Toggle mute
+  toggleMute() {
+    this.bgm.config.enable = !this.bgm.config.enable;
+  }
 }
-
-const gameAudio = new GameAudioManager();
 ```
 
-### Dynamic Volume Control
+### Dynamic Volume Fade
 
 ```javascript
-const bgm = new BGM({ volume: 0.8 });
-
-// Smooth volume transitions
-function fadeVolume(targetVolume, duration = 1000) {
+function smoothVolumeTransition(bgm, targetVolume, duration = 1000) {
   const startVolume = bgm.volume;
   const volumeDiff = targetVolume - startVolume;
   const steps = 50;
@@ -137,7 +306,14 @@ function fadeVolume(targetVolume, duration = 1000) {
 }
 
 // Usage
-fadeVolume(0.3); // Fade to 30% volume
+const bgm = new BGM({ volume: 0.8 });
+await bgm.play('ambient');
+
+// Fade to 30% when dialog starts
+smoothVolumeTransition(bgm, 0.3, 1000);
+
+// Fade back to 80% when dialog ends
+smoothVolumeTransition(bgm, 0.8, 1000);
 ```
 
 ---
@@ -147,8 +323,6 @@ fadeVolume(0.3); // Fade to 30% volume
 ### UI Sound Effects
 
 ```javascript
-import { SFX } from 'webaudiokit';
-
 class UISounds {
   constructor() {
     this.sfx = new SFX({ volume: 0.7 });
@@ -160,26 +334,46 @@ class UISounds {
       this.sfx.load('click', 'audio/ui/click.wav'),
       this.sfx.load('hover', 'audio/ui/hover.wav'),
       this.sfx.load('success', 'audio/ui/success.wav'),
-      this.sfx.load('error', 'audio/ui/error.wav'),
-      this.sfx.load('notification', 'audio/ui/notification.wav')
+      this.sfx.load('error', 'audio/ui/error.wav')
     ]);
   }
   
-  playClick() { this.sfx.play('click'); }
-  playHover() { this.sfx.play('hover', { volume: 0.4 }); }
-  playSuccess() { this.sfx.play('success'); }
-  playError() { this.sfx.play('error'); }
-  playNotification() { this.sfx.play('notification'); }
+  playClick() {
+    this.sfx.play('click');
+  }
+  
+  playHover() {
+    this.sfx.play('hover', { volume: 0.4 });
+  }
+  
+  playSuccess() {
+    this.sfx.play('success');
+  }
+  
+  playError() {
+    this.sfx.play('error');
+  }
 }
 
-// Usage with DOM events
+// Attach to DOM events
 const ui = new UISounds();
 
 document.querySelectorAll('button').forEach(btn => {
   btn.addEventListener('mouseenter', () => ui.playHover());
   btn.addEventListener('click', () => ui.playClick());
 });
+
+document.getElementById('submit-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await submitForm();
+    ui.playSuccess();
+  } catch (error) {
+    ui.playError();
+  }
+});
 ```
+
 ### Game Sound Effects
 
 ```javascript
@@ -187,33 +381,27 @@ class GameSFX {
   constructor() {
     this.sfx = new SFX({ 
       volume: 0.8,
-      stopOnHidden: false // Keep playing when tab hidden
+      stopOnHidden: false
     });
-    this.loadGameSounds();
+    this.loadSounds();
   }
   
-  async loadGameSounds() {
-    const sounds = [
-      'jump', 'land', 'collect', 'powerup', 'hurt', 'explosion',
-      'laser', 'shield', 'teleport', 'victory'
-    ];
-    
+  async loadSounds() {
+    const sounds = ['jump', 'land', 'collect', 'hurt', 'explosion', 'laser'];
     await Promise.all(
-      sounds.map(sound => 
-        this.sfx.load(sound, `audio/game/${sound}.wav`)
-      )
+      sounds.map(sound => this.sfx.load(sound, `audio/game/${sound}.wav`))
     );
   }
   
-  // Rapid fire effects
+  // Rapid fire with pitch variation
   shootLaser() {
     this.sfx.play('laser', { 
       volume: 0.6,
-      rate: 1 + (Math.random() * 0.2 - 0.1) // Slight pitch variation
+      rate: 1 + (Math.random() * 0.2 - 0.1)
     });
   }
   
-  // Overlapping explosions
+  // Layered explosion effect
   explode(intensity = 1) {
     const count = Math.ceil(intensity * 3);
     for (let i = 0; i < count; i++) {
@@ -225,34 +413,13 @@ class GameSFX {
       }, i * 100);
     }
   }
-}
-```
-
-### Spatial Audio Effects
-
-```javascript
-class SpatialSFX extends SFX {
-  constructor(options) {
-    super(options);
-    this.listenerPosition = { x: 0, y: 0 };
-  }
   
-  // Play sound with distance-based volume
-  playAtPosition(id, position, maxDistance = 100) {
-    const distance = Math.sqrt(
-      Math.pow(position.x - this.listenerPosition.x, 2) +
-      Math.pow(position.y - this.listenerPosition.y, 2)
-    );
-    
+  // Distance-based volume
+  playAtDistance(soundId, distance, maxDistance = 100) {
     const volume = Math.max(0, 1 - (distance / maxDistance));
-    
     if (volume > 0) {
-      this.play(id, { volume });
+      this.sfx.play(soundId, { volume });
     }
-  }
-  
-  updateListenerPosition(x, y) {
-    this.listenerPosition = { x, y };
   }
 }
 ```
@@ -261,12 +428,10 @@ class SpatialSFX extends SFX {
 
 ## Music Player Examples
 
-### Basic Music Player
+### Basic Player with UI
 
 ```javascript
-import { MusicPlayer, Music, PlayMode } from 'webaudiokit';
-
-class MyMusicPlayer {
+class MusicPlayerUI {
   constructor() {
     this.player = new MusicPlayer({
       volume: 0.8,
@@ -277,11 +442,12 @@ class MyMusicPlayer {
     });
     
     this.setupEventListeners();
+    this.setupUI();
   }
   
   setupEventListeners() {
     this.player.on('musicchange', (music) => {
-      this.updateUI(music);
+      this.updateTrackInfo(music);
     });
     
     this.player.on('timeupdate', ({ currentTime, duration }) => {
@@ -292,10 +458,34 @@ class MyMusicPlayer {
       this.displayLyric(lyric);
     });
     
+    this.player.on('play', () => {
+      document.getElementById('play-btn').textContent = '⏸';
+    });
+    
+    this.player.on('pause', () => {
+      document.getElementById('play-btn').textContent = '▶';
+    });
+    
     this.player.on('error', (error) => {
       console.error('Playback error:', error);
-      this.showErrorMessage('Failed to play track');
+      this.showError('Failed to play track');
     });
+  }
+  
+  setupUI() {
+    document.getElementById('play-btn').onclick = () => this.togglePlay();
+    document.getElementById('prev-btn').onclick = () => this.player.playPrev();
+    document.getElementById('next-btn').onclick = () => this.player.playNext();
+    
+    document.getElementById('volume-slider').oninput = (e) => {
+      this.player.config.volume = parseFloat(e.target.value);
+    };
+    
+    document.getElementById('progress-bar').onclick = (e) => {
+      const rect = e.target.getBoundingClientRect();
+      const progress = (e.clientX - rect.left) / rect.width;
+      this.player.progress = progress;
+    };
   }
   
   async loadPlaylist(tracks) {
@@ -311,7 +501,15 @@ class MyMusicPlayer {
     this.player.addList(musicList);
   }
   
-  updateUI(music) {
+  async togglePlay() {
+    if (this.player.paused) {
+      await this.player.play();
+    } else {
+      this.player.pause();
+    }
+  }
+  
+  updateTrackInfo(music) {
     const meta = music.meta;
     document.getElementById('track-title').textContent = meta.title || 'Unknown';
     document.getElementById('track-artist').textContent = meta.artist || 'Unknown';
@@ -323,15 +521,14 @@ class MyMusicPlayer {
   
   updateProgress(currentTime, duration) {
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-    document.getElementById('progress-bar').style.width = `${progress}%`;
+    document.getElementById('progress-fill').style.width = `${progress}%`;
     
     document.getElementById('current-time').textContent = this.formatTime(currentTime);
     document.getElementById('total-time').textContent = this.formatTime(duration);
   }
   
   displayLyric(lyric) {
-    const lyricElement = document.getElementById('current-lyric');
-    lyricElement.textContent = lyric ? lyric.text : '';
+    document.getElementById('current-lyric').textContent = lyric ? lyric.text : '';
   }
   
   formatTime(seconds) {
@@ -340,74 +537,12 @@ class MyMusicPlayer {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
-}
-```
-### Streaming Music Player
-
-```javascript
-class StreamingPlayer {
-  constructor() {
-    this.player = new MusicPlayer({
-      volume: 0.8,
-      preload: true,
-      stopOnHidden: false
-    });
-    
-    this.currentPlaylist = null;
-    this.setupMediaSession();
-  }
   
-  // Load from streaming service API
-  async loadFromAPI(playlistId) {
-    try {
-      const response = await fetch(`/api/playlist/${playlistId}`);
-      const data = await response.json();
-      
-      await this.player.addFromMeting(data.tracks);
-      this.currentPlaylist = data;
-      
-      return data;
-    } catch (error) {
-      console.error('Failed to load playlist:', error);
-      throw error;
-    }
-  }
-  
-  // Media Session API integration
-  setupMediaSession() {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', () => {
-        this.player.play();
-      });
-      
-      navigator.mediaSession.setActionHandler('pause', () => {
-        this.player.pause();
-      });
-      
-      navigator.mediaSession.setActionHandler('previoustrack', () => {
-        this.player.playPrev();
-      });
-      
-      navigator.mediaSession.setActionHandler('nexttrack', () => {
-        this.player.playNext();
-      });
-      
-      this.player.on('musicchange', (music) => {
-        this.updateMediaSession(music);
-      });
-    }
-  }
-  
-  updateMediaSession(music) {
-    if ('mediaSession' in navigator) {
-      const meta = music.meta;
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: meta.title || 'Unknown Track',
-        artist: meta.artist || 'Unknown Artist',
-        album: meta.album || 'Unknown Album',
-        artwork: meta.cover ? [{ src: meta.cover }] : []
-      });
-    }
+  showError(message) {
+    const errorEl = document.getElementById('error-message');
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+    setTimeout(() => errorEl.style.display = 'none', 3000);
   }
 }
 ```
@@ -426,14 +561,9 @@ class PlaylistManager {
     const playlist = {
       id,
       name,
-      tracks: tracks.map(track => new Music(track.url, track.metadata, track.lrcUrl)),
-      createdAt: new Date(),
-      duration: 0
+      tracks: tracks.map(t => new Music(t.url, t.metadata, t.lrcUrl)),
+      createdAt: new Date()
     };
-    
-    playlist.duration = playlist.tracks.reduce((total, track) => {
-      return total + (track.meta.duration || 0);
-    }, 0);
     
     this.playlists.set(id, playlist);
     return playlist;
@@ -457,7 +587,6 @@ class PlaylistManager {
     const music = new Music(track.url, track.metadata, track.lrcUrl);
     playlist.tracks.push(music);
     
-    // If this playlist is currently loaded, add to player
     if (this.currentPlaylistId === playlistId) {
       this.player.add(music);
     }
@@ -469,26 +598,13 @@ class PlaylistManager {
     
     playlist.tracks.splice(trackIndex, 1);
     
-    // If this playlist is currently loaded, remove from player
     if (this.currentPlaylistId === playlistId) {
       this.player.remove(trackIndex);
     }
   }
   
-  shufflePlaylist(playlistId) {
-    const playlist = this.playlists.get(playlistId);
-    if (!playlist) return;
-    
-    // Fisher-Yates shuffle
-    for (let i = playlist.tracks.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [playlist.tracks[i], playlist.tracks[j]] = [playlist.tracks[j], playlist.tracks[i]];
-    }
-    
-    // Reload if current
-    if (this.currentPlaylistId === playlistId) {
-      this.loadPlaylist(playlistId);
-    }
+  getAllPlaylists() {
+    return Array.from(this.playlists.values());
   }
 }
 ```
@@ -497,121 +613,37 @@ class PlaylistManager {
 
 ## Advanced Patterns
 
-### Enable/Disable Control
+### Cross-Fade Transitions
 
 ```javascript
-// Use enable property to control audio playback
-const bgm = new BGM({ enable: true });
-const sfx = new SFX({ enable: true });
-const player = new MusicPlayer({ enable: true });
-
-// Dynamically disable/enable
-function toggleAudio(enabled) {
-  bgm.enable = enabled;
-  sfx.enable = enabled;
-  player.enable = enabled;
-}
-
-// Use in settings menu
-class AudioSettings {
+class CrossFadeManager {
   constructor() {
-    this.bgm = new BGM();
-    this.sfx = new SFX();
-    this.player = new MusicPlayer();
+    this.bgmA = new BGM({ volume: 0 });
+    this.bgmB = new BGM({ volume: 0 });
+    this.currentBGM = this.bgmA;
+    this.nextBGM = this.bgmB;
   }
   
-  setBGMEnabled(enabled) {
-    this.bgm.enable = enabled;
-    localStorage.setItem('bgm-enabled', enabled);
-  }
-  
-  setSFXEnabled(enabled) {
-    this.sfx.enable = enabled;
-    localStorage.setItem('sfx-enabled', enabled);
-  }
-  
-  setMusicEnabled(enabled) {
-    this.player.enable = enabled;
-    localStorage.setItem('music-enabled', enabled);
-  }
-  
-  loadSettings() {
-    this.bgm.enable = localStorage.getItem('bgm-enabled') !== 'false';
-    this.sfx.enable = localStorage.getItem('sfx-enabled') !== 'false';
-    this.player.enable = localStorage.getItem('music-enabled') !== 'false';
-  }
-}
-```
-
-### Dynamic Configuration Updates
-
-```javascript
-// Use config getter/setter to dynamically modify configuration
-const player = new MusicPlayer({
-  volume: 0.8,
-  mode: PlayMode.SEQUENTIAL,
-  fadeIn: 500
-});
-
-// Get current configuration
-const currentConfig = player.config;
-console.log(currentConfig); // { volume: 0.8, mode: 'sequential', ... }
-
-// Update partial configuration (merge mode)
-player.config = {
-  volume: 0.5,
-  mode: PlayMode.SHUFFLE,
-  fadeOut: 1000,
-  stopOnHidden: true  // Dynamically enable pause on hidden
-};
-
-// BGM configuration update
-const bgm = new BGM({ volume: 0.7, loop: true });
-
-// Modify config at runtime
-bgm.config = {
-  volume: 0.5,
-  fadeIn: 1500,
-  fadeOut: 1000,
-  stopOnHidden: true  // Dynamically enable pause on hidden
-};
-
-// SFX configuration update
-const sfx = new SFX({ volume: 0.8 });
-
-sfx.config = {
-  volume: 0.6,
-  rate: 1.2,
-  stopOnHidden: false  // Dynamically disable stop on hidden
-};
-
-// Real-world example: User settings panel
-class UserSettings {
-  constructor(player) {
-    this.player = player;
-  }
-  
-  applySettings(settings) {
-    this.player.config = {
-      volume: settings.musicVolume,
-      mode: settings.playMode,
-      fadeIn: settings.enableFade ? 500 : 0,
-      fadeOut: settings.enableFade ? 500 : 0,
-      enable: settings.musicEnabled,
-      stopOnHidden: settings.pauseWhenHidden
-    };
-  }
-  
-  saveSettings() {
-    const config = this.player.config;
-    localStorage.setItem('player-settings', JSON.stringify(config));
-  }
-  
-  loadSettings() {
-    const saved = localStorage.getItem('player-settings');
-    if (saved) {
-      this.player.config = JSON.parse(saved);
+  async crossFade(trackId, duration = 2000) {
+    // Start next track at 0 volume
+    this.nextBGM.config.volume = 0;
+    await this.nextBGM.play(trackId);
+    
+    // Cross-fade
+    const steps = 50;
+    const stepTime = duration / steps;
+    
+    for (let i = 0; i <= steps; i++) {
+      const progress = i / steps;
+      this.currentBGM.config.volume = 1 - progress;
+      this.nextBGM.config.volume = progress;
+      
+      await new Promise(resolve => setTimeout(resolve, stepTime));
     }
+    
+    // Stop old track and swap
+    this.currentBGM.stop();
+    [this.currentBGM, this.nextBGM] = [this.nextBGM, this.currentBGM];
   }
 }
 ```
@@ -624,14 +656,13 @@ class AudioManager {
     this.bgm = null;
     this.sfx = null;
     this.player = null;
-    this.masterVolume = 1;
     this.isInitialized = false;
   }
   
   async initialize() {
     if (this.isInitialized) return;
     
-    // Wait for user interaction before creating audio
+    // Wait for user interaction
     await this.waitForUserInteraction();
     
     this.bgm = new BGM({ volume: 0.7 });
@@ -654,15 +685,7 @@ class AudioManager {
     });
   }
   
-  setMasterVolume(volume) {
-    this.masterVolume = Math.max(0, Math.min(1, volume));
-    
-    if (this.bgm) this.bgm.volume = this.bgm.volume * this.masterVolume;
-    if (this.player) this.player.volume = this.player.volume * this.masterVolume;
-    // SFX volume is applied per-play
-  }
-  
-  async cleanup() {
+  cleanup() {
     if (this.bgm) this.bgm.destroy();
     if (this.sfx) this.sfx.destroy();
     if (this.player) this.player.destroy();
@@ -671,423 +694,306 @@ class AudioManager {
   }
 }
 ```
-### Cross-Fade Transitions
-
-```javascript
-class CrossFadeManager {
-  constructor() {
-    this.bgmA = new BGM({ volume: 0 });
-    this.bgmB = new BGM({ volume: 0 });
-    this.currentBGM = this.bgmA;
-    this.nextBGM = this.bgmB;
-  }
-  
-  async crossFade(trackId, duration = 2000) {
-    // Start next track at 0 volume
-    this.nextBGM.volume = 0;
-    await this.nextBGM.play(trackId);
-    
-    // Cross-fade between tracks
-    const steps = 50;
-    const stepTime = duration / steps;
-    
-    for (let i = 0; i <= steps; i++) {
-      const progress = i / steps;
-      this.currentBGM.volume = 1 - progress;
-      this.nextBGM.volume = progress;
-      
-      await new Promise(resolve => setTimeout(resolve, stepTime));
-    }
-    
-    // Stop old track and swap references
-    this.currentBGM.stop();
-    [this.currentBGM, this.nextBGM] = [this.nextBGM, this.currentBGM];
-  }
-}
-```
-
-### Audio Visualization
-
-```javascript
-class AudioVisualizer {
-  constructor(player) {
-    this.player = player;
-    this.canvas = document.getElementById('visualizer');
-    this.ctx = this.canvas.getContext('2d');
-    this.analyser = null;
-    this.dataArray = null;
-    this.animationId = null;
-    
-    this.setupAnalyser();
-  }
-  
-  setupAnalyser() {
-    // Note: This requires access to the audio context
-    // WebAudioKit doesn't expose this directly, but you can extend it
-    this.player.on('play', () => {
-      if (!this.analyser) {
-        // Create analyser node (requires audio context access)
-        // This is a simplified example
-        this.startVisualization();
-      }
-    });
-    
-    this.player.on('pause', () => {
-      this.stopVisualization();
-    });
-  }
-  
-  startVisualization() {
-    if (this.animationId) return;
-    
-    const draw = () => {
-      // Clear canvas
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      
-      // Draw waveform or frequency bars
-      this.drawBars();
-      
-      this.animationId = requestAnimationFrame(draw);
-    };
-    
-    draw();
-  }
-  
-  stopVisualization() {
-    if (this.animationId) {
-      cancelAnimationFrame(this.animationId);
-      this.animationId = null;
-    }
-  }
-  
-  drawBars() {
-    // Simplified visualization
-    const barWidth = this.canvas.width / 64;
-    let x = 0;
-    
-    for (let i = 0; i < 64; i++) {
-      const barHeight = Math.random() * this.canvas.height * 0.8;
-      
-      this.ctx.fillStyle = `hsl(${i * 5}, 70%, 50%)`;
-      this.ctx.fillRect(x, this.canvas.height - barHeight, barWidth - 2, barHeight);
-      
-      x += barWidth;
-    }
-  }
-}
-```
 
 ---
 
-## Integration Examples
+## Framework Integration
 
-### React Integration
+### React Hook
 
 ```jsx
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MusicPlayer, Music, PlayMode } from 'webaudiokit';
 
-function MusicPlayerComponent({ playlist }) {
+function useMusicPlayer(options = {}) {
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [progress, setProgress] = useState(0);
-  const [volume, setVolume] = useState(0.8);
   
   useEffect(() => {
-    // Initialize player
     playerRef.current = new MusicPlayer({
-      volume,
+      volume: 0.8,
       mode: PlayMode.SHUFFLE,
-      fadeIn: 300,
-      fadeOut: 300
+      ...options
     });
     
     const player = playerRef.current;
     
-    // Event listeners
     player.on('play', () => setIsPlaying(true));
     player.on('pause', () => setIsPlaying(false));
     player.on('stop', () => setIsPlaying(false));
-    
-    player.on('musicchange', (music) => {
-      setCurrentTrack(music);
-    });
-    
+    player.on('musicchange', setCurrentTrack);
     player.on('timeupdate', ({ currentTime, duration }) => {
       setProgress(duration > 0 ? currentTime / duration : 0);
     });
     
-    // Cleanup
-    return () => {
-      player.destroy();
-    };
+    return () => player.destroy();
   }, []);
-  
-  useEffect(() => {
-    if (playerRef.current && playlist) {
-      const musicList = playlist.map(track => 
-        new Music(track.url, track.metadata, track.lrcUrl)
-      );
-      
-      playerRef.current.clear();
-      playerRef.current.addList(musicList);
-    }
-  }, [playlist]);
-  
-  useEffect(() => {
-    if (playerRef.current) {
-      playerRef.current.volume = volume;
-    }
-  }, [volume]);
   
   const togglePlay = async () => {
     if (!playerRef.current) return;
     
-    try {
-      if (isPlaying) {
-        playerRef.current.pause();
-      } else {
-        await playerRef.current.play();
-      }
-    } catch (error) {
-      console.error('Playback error:', error);
+    if (isPlaying) {
+      playerRef.current.pause();
+    } else {
+      await playerRef.current.play();
     }
   };
   
+  return {
+    player: playerRef.current,
+    isPlaying,
+    currentTrack,
+    progress,
+    togglePlay
+  };
+}
+
+// Usage
+function MusicPlayerComponent({ playlist }) {
+  const { player, isPlaying, currentTrack, progress, togglePlay } = useMusicPlayer();
+  
+  useEffect(() => {
+    if (player && playlist) {
+      const musicList = playlist.map(t => new Music(t.url, t.metadata, t.lrcUrl));
+      player.clear();
+      player.addList(musicList);
+    }
+  }, [player, playlist]);
+  
   return (
-    <div className="music-player">
-      <div className="track-info">
-        <h3>{currentTrack?.meta.title || 'No track'}</h3>
-        <p>{currentTrack?.meta.artist || 'Unknown artist'}</p>
-      </div>
-      
-      <div className="controls">
-        <button onClick={() => playerRef.current?.playPrev()}>⏮</button>
-        <button onClick={togglePlay}>
-          {isPlaying ? '⏸' : '▶'}
-        </button>
-        <button onClick={() => playerRef.current?.playNext()}>⏭</button>
-      </div>
-      
+    <div>
+      <h3>{currentTrack?.meta.title || 'No track'}</h3>
+      <button onClick={togglePlay}>{isPlaying ? 'Pause' : 'Play'}</button>
       <div className="progress-bar">
-        <div 
-          className="progress-fill" 
-          style={{ width: `${progress * 100}%` }}
-        />
+        <div style={{ width: `${progress * 100}%` }} />
       </div>
-      
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={volume}
-        onChange={(e) => setVolume(parseFloat(e.target.value))}
-      />
     </div>
   );
 }
 ```
 
-### Vue.js Integration
+### Vue Composable
 
-```vue
-<template>
-  <div class="audio-manager">
-    <div class="bgm-controls">
-      <h3>Background Music</h3>
-      <button @click="playBGM('ambient')">Ambient</button>
-      <button @click="playBGM('action')">Action</button>
-      <button @click="pauseBGM">Pause</button>
-      <input 
-        type="range" 
-        min="0" 
-        max="1" 
-        step="0.01"
-        v-model="bgmVolume"
-        @input="updateBGMVolume"
-      />
-    </div>
-    
-    <div class="sfx-controls">
-      <h3>Sound Effects</h3>
-      <button @click="playSFX('click')">Click</button>
-      <button @click="playSFX('explosion')">Explosion</button>
-      <p>Active: {{ sfxCount }}</p>
-    </div>
-  </div>
-</template>
+```javascript
+import { ref, onMounted, onUnmounted } from 'vue';
+import { MusicPlayer, Music, PlayMode } from 'webaudiokit';
 
-<script>
-import { BGM, SFX } from 'webaudiokit';
-
-export default {
-  name: 'AudioManager',
+export function useMusicPlayer(options = {}) {
+  const player = ref(null);
+  const isPlaying = ref(false);
+  const currentTrack = ref(null);
+  const progress = ref(0);
   
-  data() {
-    return {
-      bgm: null,
-      sfx: null,
-      bgmVolume: 0.7,
-      sfxCount: 0
-    };
-  },
-  
-  async mounted() {
-    // Initialize audio
-    this.bgm = new BGM({ 
-      volume: this.bgmVolume,
-      fadeIn: 1000,
-      fadeOut: 800
+  onMounted(() => {
+    player.value = new MusicPlayer({
+      volume: 0.8,
+      mode: PlayMode.SHUFFLE,
+      ...options
     });
     
-    this.sfx = new SFX({ volume: 0.8 });
-    
-    // Load assets
-    await Promise.all([
-      this.bgm.load('ambient', '/audio/ambient.mp3'),
-      this.bgm.load('action', '/audio/action.mp3'),
-      this.sfx.load('click', '/audio/click.wav'),
-      this.sfx.load('explosion', '/audio/explosion.wav')
-    ]);
-    
-    // Update SFX count periodically
-    this.sfxInterval = setInterval(() => {
-      this.sfxCount = this.sfx.activeCount;
-    }, 100);
-  },
+    player.value.on('play', () => isPlaying.value = true);
+    player.value.on('pause', () => isPlaying.value = false);
+    player.value.on('stop', () => isPlaying.value = false);
+    player.value.on('musicchange', (music) => currentTrack.value = music);
+    player.value.on('timeupdate', ({ currentTime, duration }) => {
+      progress.value = duration > 0 ? currentTime / duration : 0;
+    });
+  });
   
-  beforeUnmount() {
-    if (this.bgm) this.bgm.destroy();
-    if (this.sfx) this.sfx.destroy();
-    if (this.sfxInterval) clearInterval(this.sfxInterval);
-  },
-  
-  methods: {
-    async playBGM(track) {
-      try {
-        await this.bgm.play(track);
-      } catch (error) {
-        console.error('BGM playback failed:', error);
-      }
-    },
-    
-    pauseBGM() {
-      this.bgm.pause();
-    },
-    
-    updateBGMVolume() {
-      this.bgm.volume = this.bgmVolume;
-    },
-    
-    async playSFX(sound) {
-      try {
-        await this.sfx.play(sound);
-      } catch (error) {
-        console.error('SFX playback failed:', error);
-      }
+  onUnmounted(() => {
+    if (player.value) {
+      player.value.destroy();
     }
-  }
-};
-</script>
+  });
+  
+  const togglePlay = async () => {
+    if (!player.value) return;
+    
+    if (isPlaying.value) {
+      player.value.pause();
+    } else {
+      await player.value.play();
+    }
+  };
+  
+  return {
+    player,
+    isPlaying,
+    currentTrack,
+    progress,
+    togglePlay
+  };
+}
 ```
+
 ---
 
-## Performance Tips
+## Best Practices
 
-### 1. Lazy Loading Strategy
+### 1. Always Handle User Interaction
+
+Modern browsers require user interaction before playing audio:
 
 ```javascript
-class OptimizedAudioManager {
+class AudioInitializer {
   constructor() {
-    this.bgm = new BGM({ preload: false }); // Don't preload everything
-    this.sfx = new SFX({ preload: false });
-    this.loadedAssets = new Set();
+    this.isUnlocked = false;
+    this.audioManager = null;
   }
   
-  async loadOnDemand(type, id, src) {
-    const key = `${type}:${id}`;
-    if (this.loadedAssets.has(key)) return;
+  async initialize() {
+    if (this.isUnlocked) return;
     
-    if (type === 'bgm') {
-      await this.bgm.load(id, src);
-    } else if (type === 'sfx') {
-      await this.sfx.load(id, src);
-    }
-    
-    this.loadedAssets.add(key);
-  }
-  
-  async playBGM(id, src) {
-    await this.loadOnDemand('bgm', id, src);
-    return this.bgm.play(id);
-  }
-  
-  async playSFX(id, src) {
-    await this.loadOnDemand('sfx', id, src);
-    return this.sfx.play(id);
-  }
-}
-```
-
-### 2. Resource Pooling
-
-```javascript
-class AudioPool {
-  constructor(maxSize = 10) {
-    this.pool = [];
-    this.maxSize = maxSize;
-  }
-  
-  getAudio(src) {
-    // Try to reuse existing audio element
-    let audio = this.pool.find(a => a.src.endsWith(src) && a.paused);
-    
-    if (!audio) {
-      audio = new Audio(src);
-      if (this.pool.length < this.maxSize) {
-        this.pool.push(audio);
-      }
-    }
-    
-    return audio;
-  }
-  
-  cleanup() {
-    this.pool.forEach(audio => {
-      audio.src = '';
-      audio.load();
+    return new Promise(resolve => {
+      const unlock = async () => {
+        // Create silent audio to unlock
+        const audio = new Audio();
+        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT';
+        
+        try {
+          await audio.play();
+          this.isUnlocked = true;
+          this.audioManager = new AudioManager();
+          resolve();
+        } catch (e) {
+          // Still locked
+        }
+        
+        document.removeEventListener('click', unlock);
+        document.removeEventListener('touchstart', unlock);
+      };
+      
+      document.addEventListener('click', unlock);
+      document.addEventListener('touchstart', unlock);
     });
-    this.pool = [];
   }
 }
 ```
 
-### 3. Memory Management
+### 2. Clean Up Resources
 
 ```javascript
-class MemoryEfficientPlayer {
+class Component {
   constructor() {
-    this.player = new MusicPlayer({ preload: true });
-    this.maxCacheSize = 50; // Maximum tracks to keep in memory
-    this.trackCache = new Map();
+    this.bgm = new BGM();
+    this.sfx = new SFX();
+    this.player = new MusicPlayer();
   }
   
-  async addTrack(music) {
-    // Remove oldest tracks if cache is full
-    if (this.trackCache.size >= this.maxCacheSize) {
-      const oldestKey = this.trackCache.keys().next().value;
-      this.trackCache.delete(oldestKey);
+  destroy() {
+    // Always clean up when component unmounts
+    this.bgm.destroy();
+    this.sfx.destroy();
+    this.player.destroy();
+  }
+}
+```
+
+### 3. Handle Errors Gracefully
+
+```javascript
+async function playWithErrorHandling(player) {
+  try {
+    await player.play();
+  } catch (error) {
+    if (error.name === 'NotAllowedError') {
+      showMessage('Please interact with the page to enable audio');
+    } else if (error.name === 'NotSupportedError') {
+      showMessage('Audio format not supported');
+    } else {
+      showMessage('Playback failed: ' + error.message);
+    }
+  }
+}
+```
+
+### 4. Use Configuration Wisely
+
+```javascript
+// ✅ Good: Use direct property modification for single changes
+player.config.volume = 0.5;
+player.config.enable = false;
+
+// ✅ Good: Use object assignment for multiple changes
+player.config = {
+  volume: 0.5,
+  mode: PlayMode.SHUFFLE,
+  fadeIn: 500,
+  fadeOut: 500
+};
+
+// ❌ Avoid: Multiple separate assignments
+player.config = { volume: 0.5 };
+player.config = { mode: PlayMode.SHUFFLE };
+player.config = { fadeIn: 500 };
+```
+
+### 5. Optimize for Mobile
+
+```javascript
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+const player = new MusicPlayer({
+  volume: 0.8,
+  preload: !isMobile,  // Disable preload on mobile to save bandwidth
+  stopOnHidden: isMobile,  // Pause when tab hidden on mobile
+  fadeIn: isMobile ? 200 : 500,  // Shorter fades on mobile
+  fadeOut: isMobile ? 200 : 500
+});
+```
+
+### 6. Implement Lazy Loading
+
+```javascript
+class LazyAudioLoader {
+  constructor() {
+    this.bgm = new BGM({ preload: false });
+    this.loadedTracks = new Set();
+  }
+  
+  async playTrack(id, src) {
+    if (!this.loadedTracks.has(id)) {
+      await this.bgm.load(id, src);
+      this.loadedTracks.add(id);
     }
     
-    this.trackCache.set(music.url, music);
-    this.player.add(music);
+    await this.bgm.play(id);
+  }
+}
+```
+
+### 7. Monitor Performance
+
+```javascript
+class AudioPerformanceMonitor {
+  constructor(player) {
+    this.player = player;
+    this.metrics = {
+      loadTime: 0,
+      playCount: 0,
+      errorCount: 0
+    };
+    
+    this.setupMonitoring();
   }
   
-  clearCache() {
-    this.trackCache.clear();
-    this.player.clear();
+  setupMonitoring() {
+    const startTime = performance.now();
+    
+    this.player.on('play', () => {
+      this.metrics.playCount++;
+      this.metrics.loadTime = performance.now() - startTime;
+    });
+    
+    this.player.on('error', () => {
+      this.metrics.errorCount++;
+    });
+  }
+  
+  getMetrics() {
+    return { ...this.metrics };
   }
 }
 ```
@@ -1096,225 +1002,27 @@ class MemoryEfficientPlayer {
 
 ## Troubleshooting
 
-### Common Issues and Solutions
+### Audio Won't Play
 
-#### 1. Audio Won't Play on Mobile
+1. Check if user has interacted with the page
+2. Verify audio file format is supported
+3. Check browser console for errors
+4. Ensure `enable` is set to `true`
 
-```javascript
-// Solution: Wait for user interaction
-class MobileAudioFix {
-  constructor() {
-    this.isUnlocked = false;
-    this.pendingActions = [];
-  }
-  
-  async initialize() {
-    if (this.isUnlocked) return;
-    
-    return new Promise(resolve => {
-      const unlock = async () => {
-        // Create and play silent audio to unlock
-        const audio = new Audio();
-        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT';
-        
-        try {
-          await audio.play();
-          this.isUnlocked = true;
-          
-          // Execute pending actions
-          this.pendingActions.forEach(action => action());
-          this.pendingActions = [];
-          
-          resolve();
-        } catch (e) {
-          // Still locked, keep trying
-        }
-        
-        document.removeEventListener('touchstart', unlock);
-        document.removeEventListener('click', unlock);
-      };
-      
-      document.addEventListener('touchstart', unlock);
-      document.addEventListener('click', unlock);
-    });
-  }
-  
-  async safePlay(audioInstance, method, ...args) {
-    if (this.isUnlocked) {
-      return audioInstance[method](...args);
-    } else {
-      return new Promise(resolve => {
-        this.pendingActions.push(() => {
-          audioInstance[method](...args).then(resolve);
-        });
-      });
-    }
-  }
-}
-```
+### High Memory Usage
 
-#### 2. CORS Issues with Audio Files
+1. Enable lazy loading (`preload: false`)
+2. Clear unused playlists regularly
+3. Limit concurrent SFX instances
+4. Call `destroy()` when done
 
-```javascript
-// Solution: Proper server configuration or proxy
-class CORSAudioLoader {
-  constructor() {
-    this.proxyUrl = '/api/audio-proxy/';
-  }
-  
-  getAudioUrl(originalUrl) {
-    // Check if URL is from same origin
-    try {
-      const url = new URL(originalUrl);
-      if (url.origin === window.location.origin) {
-        return originalUrl;
-      }
-    } catch (e) {
-      // Relative URL, should be fine
-      return originalUrl;
-    }
-    
-    // Use proxy for cross-origin requests
-    return this.proxyUrl + encodeURIComponent(originalUrl);
-  }
-  
-  async loadAudio(src) {
-    const proxiedUrl = this.getAudioUrl(src);
-    const audio = new Audio(proxiedUrl);
-    
-    return new Promise((resolve, reject) => {
-      audio.addEventListener('canplaythrough', () => resolve(audio));
-      audio.addEventListener('error', reject);
-      audio.load();
-    });
-  }
-}
-```
+### Choppy Playback
 
-#### 3. Memory Leaks Prevention
-
-```javascript
-class LeakPreventionManager {
-  constructor() {
-    this.instances = new Set();
-    this.eventListeners = new Map();
-  }
-  
-  createBGM(options) {
-    const bgm = new BGM(options);
-    this.instances.add(bgm);
-    return bgm;
-  }
-  
-  createSFX(options) {
-    const sfx = new SFX(options);
-    this.instances.add(sfx);
-    return sfx;
-  }
-  
-  createMusicPlayer(options) {
-    const player = new MusicPlayer(options);
-    this.instances.add(player);
-    return player;
-  }
-  
-  addEventListener(instance, event, listener) {
-    if (!this.eventListeners.has(instance)) {
-      this.eventListeners.set(instance, []);
-    }
-    
-    this.eventListeners.get(instance).push({ event, listener });
-    instance.on(event, listener);
-  }
-  
-  cleanup() {
-    // Remove all event listeners
-    this.eventListeners.forEach((listeners, instance) => {
-      listeners.forEach(({ event, listener }) => {
-        instance.off(event, listener);
-      });
-    });
-    
-    // Destroy all instances
-    this.instances.forEach(instance => {
-      if (instance.destroy) {
-        instance.destroy();
-      }
-    });
-    
-    this.instances.clear();
-    this.eventListeners.clear();
-  }
-}
-
-// Usage in SPA frameworks
-window.addEventListener('beforeunload', () => {
-  audioManager.cleanup();
-});
-```
-
-#### 4. Autoplay Policy Handling
-
-```javascript
-class AutoplayHandler {
-  static async handleAutoplay(audioInstance, playMethod, ...args) {
-    try {
-      await audioInstance[playMethod](...args);
-      return { success: true };
-    } catch (error) {
-      if (error.name === 'NotAllowedError') {
-        return { 
-          success: false, 
-          reason: 'autoplay-blocked',
-          message: 'Autoplay blocked. User interaction required.'
-        };
-      }
-      throw error;
-    }
-  }
-  
-  static showAutoplayPrompt() {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = `
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.8); display: flex;
-      align-items: center; justify-content: center;
-      z-index: 10000; color: white; font-family: sans-serif;
-    `;
-    
-    overlay.innerHTML = `
-      <div style="text-align: center; padding: 20px;">
-        <h3>Enable Audio</h3>
-        <p>Click to enable audio playback</p>
-        <button style="padding: 10px 20px; font-size: 16px;">
-          Enable Audio
-        </button>
-      </div>
-    `;
-    
-    return new Promise(resolve => {
-      overlay.querySelector('button').onclick = () => {
-        document.body.removeChild(overlay);
-        resolve();
-      };
-      
-      document.body.appendChild(overlay);
-    });
-  }
-}
-```
+1. Reduce fade duration
+2. Enable preloading for next track
+3. Use lower quality audio files
+4. Reduce concurrent audio instances
 
 ---
 
-## Best Practices Summary
-
-1. **Always handle user interaction requirements** - Modern browsers require user interaction before audio playback
-2. **Use appropriate fade times** - 300-1000ms works well for most transitions
-3. **Implement proper error handling** - Network issues and codec problems are common
-4. **Clean up resources** - Call `destroy()` methods when components unmount
-5. **Consider mobile limitations** - Lower quality audio and fewer simultaneous sounds
-6. **Preload strategically** - Balance UX and bandwidth usage
-7. **Handle page visibility** - Pause/resume audio when tab becomes hidden/visible
-8. **Use event listeners wisely** - Remove listeners to prevent memory leaks
-9. **Test across browsers** - Audio support varies between browsers and devices
-10. **Provide fallbacks** - Always have a plan when audio fails to load or play
+For more examples and API details, see [API.md](API.md).
