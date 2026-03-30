@@ -60,37 +60,41 @@ export class BGM {
         // 处理配置变更
         this.handleConfigChange(prop as keyof BGMOptions, value, oldValue);
         return true;
-      }
+      },
     });
   }
 
-  private handleConfigChange(key: keyof BGMOptions, newValue: any, oldValue: any): void {
+  private handleConfigChange(
+    key: keyof BGMOptions,
+    newValue: any,
+    oldValue: any,
+  ): void {
     if (newValue === oldValue) return;
 
     switch (key) {
-      case 'enable':
+      case "enable":
         if (newValue === false) {
           this.clearFade();
           this.stop();
         }
         break;
-      case 'volume':
+      case "volume":
         if (this.audio) {
           this.audio.volume = Math.max(0, Math.min(1, newValue));
-          this.emit('volumechange', newValue);
+          this.emit("volumechange", newValue);
         }
         break;
-      case 'rate':
+      case "rate":
         if (this.audio) {
           this.audio.playbackRate = newValue;
         }
         break;
-      case 'loop':
+      case "loop":
         if (this.audio) {
           this.audio.loop = newValue;
         }
         break;
-      case 'stopOnHidden':
+      case "stopOnHidden":
         this.setupVisibilityHandler();
         break;
     }
@@ -133,12 +137,16 @@ export class BGM {
       return;
     }
     return new Promise((resolve, reject) => {
-      const audio = new Audio(src);
+      let audio: HTMLAudioElement | null = new Audio(src);
+      this.Cache.set(id, src);
       const onLoad = () => {
-        this.Cache.set(id, src);
+        audio = null;
         resolve();
       };
-      const onError = (e: ErrorEvent) => reject(e);
+      const onError = (e: ErrorEvent) => {
+        audio = null;
+        reject(e);
+      };
       audio.addEventListener("canplaythrough", onLoad, { once: true });
       audio.addEventListener("error", onError, { once: true });
       audio.load();
@@ -243,7 +251,7 @@ export class BGM {
     return this.configProxy;
   }
   set config(newConfig: Partial<BGMOptions>) {
-    Object.keys(newConfig).forEach(key => {
+    Object.keys(newConfig).forEach((key) => {
       const k = key as keyof BGMOptions;
       if (newConfig[k] !== undefined) {
         (this.configProxy as any)[k] = newConfig[k];

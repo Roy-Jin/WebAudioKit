@@ -3,9 +3,16 @@
  * 管理播放列表，支持多种播放模式、页面隐藏暂停/恢复
  */
 
-import type { MusicPlayerOptions, MetingData, EventType, EventListener, Lyric, Metadata } from '../types';
-import { PlayState, PlayMode } from '../types';
-import { Music } from './Music';
+import type {
+  EventListener,
+  EventType,
+  Lyric,
+  Metadata,
+  MetingData,
+  MusicPlayerOptions,
+} from "../types";
+import { PlayMode, PlayState } from "../types";
+import { Music } from "./Music";
 
 const DEFAULT_FADE_MS = 1000;
 
@@ -24,7 +31,7 @@ export class MusicPlayer {
     stopOnHidden: false,
     preload: true,
     mode: PlayMode.SEQUENTIAL,
-    enable: true
+    enable: true,
   };
   private configProxy: MusicPlayerOptions;
 
@@ -45,7 +52,9 @@ export class MusicPlayer {
   private preloadSrc: string | null = null;
 
   constructor(options: MusicPlayerOptions = {}) {
-    if (options.volume !== undefined) this.Config.volume = Math.max(0, Math.min(1, options.volume));
+    if (options.volume !== undefined) {
+      this.Config.volume = Math.max(0, Math.min(1, options.volume));
+    }
     if (options.rate !== undefined) this.Config.rate = options.rate;
     if (options.loop !== undefined) this.Config.loop = options.loop;
     if (options.mode !== undefined) this.Config.mode = options.mode;
@@ -53,7 +62,9 @@ export class MusicPlayer {
     this.Config.fadeIn = resolveFadeMs(options.fade, options.fadeIn);
     this.Config.fadeOut = resolveFadeMs(options.fade, options.fadeOut);
     if (options.preload !== undefined) this.Config.preload = options.preload;
-    if (options.stopOnHidden !== undefined) this.Config.stopOnHidden = options.stopOnHidden;
+    if (options.stopOnHidden !== undefined) {
+      this.Config.stopOnHidden = options.stopOnHidden;
+    }
 
     this.configProxy = this.createConfigProxy();
     this.setupVisibilityHandler();
@@ -66,44 +77,52 @@ export class MusicPlayer {
         (target as any)[prop] = value;
 
         // 处理配置变更
-        this.handleConfigChange(prop as keyof MusicPlayerOptions, value, oldValue);
+        this.handleConfigChange(
+          prop as keyof MusicPlayerOptions,
+          value,
+          oldValue,
+        );
         return true;
-      }
+      },
     });
   }
 
-  private handleConfigChange(key: keyof MusicPlayerOptions, newValue: any, oldValue: any): void {
+  private handleConfigChange(
+    key: keyof MusicPlayerOptions,
+    newValue: any,
+    oldValue: any,
+  ): void {
     if (newValue === oldValue) return;
 
     switch (key) {
-      case 'enable':
+      case "enable":
         if (newValue === false) {
           this.clearFade();
           this.stop();
         }
         break;
-      case 'volume':
+      case "volume":
         if (this.audio) {
           this.audio.volume = Math.max(0, Math.min(1, newValue));
-          this.emit('volumechange', newValue);
+          this.emit("volumechange", newValue);
         }
         break;
-      case 'rate':
+      case "rate":
         if (this.audio) {
           this.audio.playbackRate = newValue;
         }
         break;
-      case 'loop':
+      case "loop":
         if (this.audio) {
           this.audio.loop = newValue;
         }
         break;
-      case 'mode':
+      case "mode":
         if (newValue === PlayMode.SHUFFLE) {
           this.rebuildShuffle();
         }
         break;
-      case 'stopOnHidden':
+      case "stopOnHidden":
         this.setupVisibilityHandler();
         break;
     }
@@ -112,7 +131,7 @@ export class MusicPlayer {
   private setupVisibilityHandler(): void {
     // 清理旧的监听器
     if (this.visibilityHandler) {
-      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
       this.visibilityHandler = null;
     }
 
@@ -129,11 +148,11 @@ export class MusicPlayer {
           this.blocked = false;
           if (this.pausedByHidden && this.audio) {
             this.pausedByHidden = false;
-            this.audio.play().catch(e => this.emit('error', e));
+            this.audio.play().catch((e) => this.emit("error", e));
           }
         }
       };
-      document.addEventListener('visibilitychange', this.visibilityHandler);
+      document.addEventListener("visibilitychange", this.visibilityHandler);
     }
   }
 
@@ -143,22 +162,22 @@ export class MusicPlayer {
     this.playlist.push(music);
     if (this.index === -1) this.index = 0;
     this.rebuildShuffle();
-    this.emit('playlistchange');
+    this.emit("playlistchange");
   }
 
   addList(musicList: Music[]): void {
     this.playlist.push(...musicList);
     if (this.index === -1 && this.playlist.length > 0) this.index = 0;
     this.rebuildShuffle();
-    this.emit('playlistchange');
+    this.emit("playlistchange");
   }
 
   async addFromMeting(data: MetingData[]): Promise<void> {
-    const musicList = data.map(item => {
+    const musicList = data.map((item) => {
       const metadata: Metadata = {
         title: item.name ?? item.title,
         artist: item.artist ?? item.author,
-        album: item.album ?? '',
+        album: item.album ?? "",
         cover: item.pic ?? item.cover,
       };
       // 只存歌词 URL，播放时懒加载
@@ -171,9 +190,11 @@ export class MusicPlayer {
   remove(idx: number): void {
     if (idx < 0 || idx >= this.playlist.length) return;
     this.playlist.splice(idx, 1);
-    if (this.index >= this.playlist.length) this.index = this.playlist.length - 1;
+    if (this.index >= this.playlist.length) {
+      this.index = this.playlist.length - 1;
+    }
     this.rebuildShuffle();
-    this.emit('playlistchange');
+    this.emit("playlistchange");
   }
 
   clear(): void {
@@ -181,7 +202,7 @@ export class MusicPlayer {
     this.playlist = [];
     this.index = -1;
     this.shuffleOrder = [];
-    this.emit('playlistchange');
+    this.emit("playlistchange");
   }
 
   // ==================== 播放控制 ====================
@@ -199,7 +220,9 @@ export class MusicPlayer {
 
     // 没有 audio 实例时，加载当前 index
     if (!this.audio) {
-      if (this.playlist.length === 0 || this.index < 0) throw new Error('No music to play');
+      if (this.playlist.length === 0 || this.index < 0) {
+        throw new Error("No music to play");
+      }
       await this.loadAt(this.index);
       return;
     }
@@ -208,7 +231,7 @@ export class MusicPlayer {
       await this.audio.play();
     } catch (error) {
       this._state = PlayState.ERROR;
-      this.emit('error', error);
+      this.emit("error", error);
       throw error;
     }
   }
@@ -226,10 +249,10 @@ export class MusicPlayer {
     this.pausedByHidden = false;
     this.audio.pause();
     this.audio.currentTime = 0;
-    this.audio.src = '';
+    this.audio.src = "";
     this.audio.load();
     this._state = PlayState.STOPPED;
-    this.emit('stop');
+    this.emit("stop");
   }
 
   async playNext(): Promise<void> {
@@ -253,7 +276,9 @@ export class MusicPlayer {
   // ==================== 内部加载 ====================
 
   private async loadAt(idx: number): Promise<void> {
-    if (idx < 0 || idx >= this.playlist.length) throw new Error('Invalid music index');
+    if (idx < 0 || idx >= this.playlist.length) {
+      throw new Error("Invalid music index");
+    }
 
     const music = this.playlist[idx];
 
@@ -263,7 +288,7 @@ export class MusicPlayer {
     }
     if (this.audio) {
       this.audio.pause();
-      this.audio.src = '';
+      this.audio.src = "";
       this.audio = null;
     }
 
@@ -275,7 +300,7 @@ export class MusicPlayer {
     } else {
       // 丢弃不匹配的预加载
       if (this.preloadAudio) {
-        this.preloadAudio.src = '';
+        this.preloadAudio.src = "";
         this.preloadAudio = null;
         this.preloadSrc = null;
       }
@@ -288,7 +313,7 @@ export class MusicPlayer {
     this.lyricIndex = -1;
     this._state = PlayState.LOADING;
     this.setupEvents();
-    this.emit('musicchange', music);
+    this.emit("musicchange", music);
 
     // 歌词懒加载，不阻塞播放
     music.loadLyrics().catch(() => {});
@@ -298,7 +323,7 @@ export class MusicPlayer {
         await this.execFadeIn(this.audio);
       } catch (error) {
         this._state = PlayState.ERROR;
-        this.emit('error', error);
+        this.emit("error", error);
         throw error;
       }
     }
@@ -309,33 +334,36 @@ export class MusicPlayer {
 
   private setupEvents(): void {
     if (!this.audio) return;
-    this.audio.addEventListener('play', () => {
+    this.audio.addEventListener("play", () => {
       this._state = PlayState.PLAYING;
-      this.emit('play');
+      this.emit("play");
     });
-    this.audio.addEventListener('pause', () => {
+    this.audio.addEventListener("pause", () => {
       this._state = PlayState.PAUSED;
-      this.emit('pause');
+      this.emit("pause");
     });
-    this.audio.addEventListener('ended', () => {
-      this.emit('ended');
+    this.audio.addEventListener("ended", () => {
+      this.emit("ended");
       this.handleEnded();
     });
-    this.audio.addEventListener('timeupdate', () => {
+    this.audio.addEventListener("timeupdate", () => {
       if (!this.audio) return;
-      this.emit('timeupdate', { currentTime: this.audio.currentTime, duration: this.audio.duration });
+      this.emit("timeupdate", {
+        currentTime: this.audio.currentTime,
+        duration: this.audio.duration,
+      });
       this.updateLyric();
     });
-    this.audio.addEventListener('error', (e) => {
+    this.audio.addEventListener("error", (e) => {
       this._state = PlayState.ERROR;
-      this.emit('error', e);
+      this.emit("error", e);
     });
   }
 
   private async handleEnded(): Promise<void> {
     if (!this.Config.enable) {
       this._state = PlayState.STOPPED;
-      this.emit('stop');
+      this.emit("stop");
       return;
     }
     const nextIdx = this.resolveNext();
@@ -343,7 +371,7 @@ export class MusicPlayer {
       await this.loadAt(nextIdx);
     } else {
       this._state = PlayState.STOPPED;
-      this.emit('stop');
+      this.emit("stop");
     }
   }
 
@@ -360,14 +388,14 @@ export class MusicPlayer {
 
     // 清理旧的预加载
     if (this.preloadAudio) {
-      this.preloadAudio.src = '';
+      this.preloadAudio.src = "";
       this.preloadAudio = null;
     }
 
     // 预加载音频
     this.preloadSrc = next.url;
     this.preloadAudio = new Audio();
-    this.preloadAudio.preload = 'auto';
+    this.preloadAudio.preload = "auto";
     this.preloadAudio.src = next.url;
     this.preloadAudio.volume = 0;
     this.preloadAudio.load();
@@ -423,7 +451,8 @@ export class MusicPlayer {
 
       case PlayMode.SHUFFLE: {
         const pos = this.shuffleOrder.indexOf(this.index);
-        return this.shuffleOrder[pos === 0 ? this.shuffleOrder.length - 1 : pos - 1];
+        return this
+          .shuffleOrder[pos === 0 ? this.shuffleOrder.length - 1 : pos - 1];
       }
 
       case PlayMode.LOOP:
@@ -438,10 +467,16 @@ export class MusicPlayer {
   }
 
   private rebuildShuffle(): void {
-    this.shuffleOrder = Array.from({ length: this.playlist.length }, (_, i) => i);
+    this.shuffleOrder = Array.from(
+      { length: this.playlist.length },
+      (_, i) => i,
+    );
     for (let i = this.shuffleOrder.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [this.shuffleOrder[i], this.shuffleOrder[j]] = [this.shuffleOrder[j], this.shuffleOrder[i]];
+      [this.shuffleOrder[i], this.shuffleOrder[j]] = [
+        this.shuffleOrder[j],
+        this.shuffleOrder[i],
+      ];
     }
   }
 
@@ -460,68 +495,101 @@ export class MusicPlayer {
 
     if (newIndex !== this.lyricIndex) {
       this.lyricIndex = newIndex;
-      this.emit('lyricchange', this.lyric);
+      this.emit("lyricchange", this.lyric);
     }
   }
 
   // ==================== Getters & Setters ====================
 
-  get volume(): number { return this.audio?.volume ?? this.Config.volume!; }
+  get volume(): number {
+    return this.audio?.volume ?? this.Config.volume!;
+  }
   set volume(value: number) {
     const vol = Math.max(0, Math.min(1, value));
     this.Config.volume = vol;
-    if (this.audio) { this.audio.volume = vol; this.emit('volumechange', vol); }
+    if (this.audio) {
+      this.audio.volume = vol;
+      this.emit("volumechange", vol);
+    }
   }
 
-  get rate(): number { return this.audio?.playbackRate ?? this.Config.rate!; }
+  get rate(): number {
+    return this.audio?.playbackRate ?? this.Config.rate!;
+  }
   set rate(value: number) {
     this.Config.rate = value;
     if (this.audio) this.audio.playbackRate = value;
   }
 
-  get loop(): boolean { return this.audio?.loop ?? this.Config.loop!; }
+  get loop(): boolean {
+    return this.audio?.loop ?? this.Config.loop!;
+  }
   set loop(value: boolean) {
     this.Config.loop = value;
     if (this.audio) this.audio.loop = value;
   }
 
-  get currentTime(): number { return this.audio?.currentTime ?? 0; }
-  set currentTime(value: number) { if (this.audio) this.audio.currentTime = value; }
+  get currentTime(): number {
+    return this.audio?.currentTime ?? 0;
+  }
+  set currentTime(value: number) {
+    if (this.audio) this.audio.currentTime = value;
+  }
 
-  get duration(): number { return this.audio?.duration ?? 0; }
-  get paused(): boolean { return this.audio?.paused ?? true; }
-  get state(): PlayState { return this._state; }
+  get duration(): number {
+    return this.audio?.duration ?? 0;
+  }
+  get paused(): boolean {
+    return this.audio?.paused ?? true;
+  }
+  get state(): PlayState {
+    return this._state;
+  }
 
-  get progress(): number { return this.duration > 0 ? this.currentTime / this.duration : 0; }
-  set progress(value: number) { this.currentTime = value * this.duration; }
+  get progress(): number {
+    return this.duration > 0 ? this.currentTime / this.duration : 0;
+  }
+  set progress(value: number) {
+    this.currentTime = value * this.duration;
+  }
 
   get current(): Music | null {
-    return this.index >= 0 && this.index < this.playlist.length ? this.playlist[this.index] : null;
+    return this.index >= 0 && this.index < this.playlist.length
+      ? this.playlist[this.index]
+      : null;
   }
 
   get(idx: number): Music | null {
     return idx >= 0 && idx < this.playlist.length ? this.playlist[idx] : null;
   }
 
-  getAll(): Music[] { return [...this.playlist]; }
+  getAll(): Music[] {
+    return [...this.playlist];
+  }
 
-  get length(): number { return this.playlist.length; }
-  get currentIndex(): number { return this.index; }
+  get length(): number {
+    return this.playlist.length;
+  }
+  get currentIndex(): number {
+    return this.index;
+  }
   set currentIndex(value: number) {
     if (value >= 0 && value < this.playlist.length) this.index = value;
   }
 
-  get playMode(): PlayMode { return this.Config.mode!; }
+  get playMode(): PlayMode {
+    return this.Config.mode!;
+  }
   set playMode(value: PlayMode) {
     this.Config.mode = value;
     if (value === PlayMode.SHUFFLE) this.rebuildShuffle();
   }
 
-  get config(): MusicPlayerOptions { 
-    return this.configProxy; 
+  get config(): MusicPlayerOptions {
+    return this.configProxy;
   }
   set config(newConfig: Partial<MusicPlayerOptions>) {
-    Object.keys(newConfig).forEach(key => {
+    Object.keys(newConfig).forEach((key) => {
       const k = key as keyof MusicPlayerOptions;
       if (newConfig[k] !== undefined) {
         (this.configProxy as any)[k] = newConfig[k];
@@ -533,15 +601,21 @@ export class MusicPlayer {
     const music = this.current;
     if (!music) return null;
     const lyrics = music.getLyrics();
-    return this.lyricIndex >= 0 && this.lyricIndex < lyrics.length ? lyrics[this.lyricIndex] : null;
+    return this.lyricIndex >= 0 && this.lyricIndex < lyrics.length
+      ? lyrics[this.lyricIndex]
+      : null;
   }
 
-  getLyrics(): Lyric[] { return this.current?.getLyrics() ?? []; }
+  getLyrics(): Lyric[] {
+    return this.current?.getLyrics() ?? [];
+  }
 
   // ==================== Events ====================
 
   on(event: EventType, listener: EventListener): void {
-    if (!this.eventListeners.has(event)) this.eventListeners.set(event, new Set());
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, new Set());
+    }
     this.eventListeners.get(event)!.add(listener);
   }
 
@@ -550,16 +624,24 @@ export class MusicPlayer {
   }
 
   private emit(event: EventType, data?: any): void {
-    this.eventListeners.get(event)?.forEach(listener => listener(data));
+    this.eventListeners.get(event)?.forEach((listener) => listener(data));
   }
 
   destroy(): void {
     this.clearFade();
     this.stop();
-    if (this.audio) { this.audio.src = ''; this.audio.load(); this.audio = null; }
-    if (this.preloadAudio) { this.preloadAudio.src = ''; this.preloadAudio = null; this.preloadSrc = null; }
+    if (this.audio) {
+      this.audio.src = "";
+      this.audio.load();
+      this.audio = null;
+    }
+    if (this.preloadAudio) {
+      this.preloadAudio.src = "";
+      this.preloadAudio = null;
+      this.preloadSrc = null;
+    }
     if (this.visibilityHandler) {
-      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
       this.visibilityHandler = null;
     }
     this.eventListeners.clear();
@@ -568,7 +650,10 @@ export class MusicPlayer {
   }
 
   private clearFade(): void {
-    if (this.fadeTimer !== null) { clearInterval(this.fadeTimer); this.fadeTimer = null; }
+    if (this.fadeTimer !== null) {
+      clearInterval(this.fadeTimer);
+      this.fadeTimer = null;
+    }
   }
 
   private async execFadeIn(audio: HTMLAudioElement): Promise<void> {
@@ -585,8 +670,11 @@ export class MusicPlayer {
       let vol = 0;
       this.fadeTimer = window.setInterval(() => {
         vol += step;
-        if (vol >= target) { audio.volume = target; this.clearFade(); resolve(); }
-        else audio.volume = vol;
+        if (vol >= target) {
+          audio.volume = target;
+          this.clearFade();
+          resolve();
+        } else audio.volume = vol;
       }, 50);
     });
   }
@@ -600,8 +688,11 @@ export class MusicPlayer {
       let vol = start;
       this.fadeTimer = window.setInterval(() => {
         vol -= step;
-        if (vol <= 0) { audio.volume = 0; this.clearFade(); resolve(); }
-        else audio.volume = vol;
+        if (vol <= 0) {
+          audio.volume = 0;
+          this.clearFade();
+          resolve();
+        } else audio.volume = vol;
       }, 50);
     });
   }

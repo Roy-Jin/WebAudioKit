@@ -73,21 +73,21 @@ export interface MusicPlayerOptions extends FadeOptions {
  * 播放模式
  */
 export enum PlayMode {
-  LOOP = 'loop',
-  SHUFFLE = 'shuffle',
-  SINGLE = 'single',
-  SEQUENTIAL = 'sequential'
+  LOOP = "loop",
+  SHUFFLE = "shuffle",
+  SINGLE = "single",
+  SEQUENTIAL = "sequential",
 }
 
 /**
  * 播放状态
  */
 export enum PlayState {
-  PLAYING = 'playing',
-  PAUSED = 'paused',
-  STOPPED = 'stopped',
-  LOADING = 'loading',
-  ERROR = 'error'
+  PLAYING = "playing",
+  PAUSED = "paused",
+  STOPPED = "stopped",
+  LOADING = "loading",
+  ERROR = "error",
 }
 
 /**
@@ -118,19 +118,19 @@ export interface MetingData {
 /**
  * 事件类型
  */
-export type EventType = 
-  | 'play'
-  | 'pause'
-  | 'stop'
-  | 'ended'
-  | 'timeupdate'
-  | 'volumechange'
-  | 'error'
-  | 'loaded'
-  | 'lyricchange'
-  | 'lyricsloaded'
-  | 'musicchange'
-  | 'playlistchange';
+export type EventType =
+  | "play"
+  | "pause"
+  | "stop"
+  | "ended"
+  | "timeupdate"
+  | "volumechange"
+  | "error"
+  | "loaded"
+  | "lyricchange"
+  | "lyricsloaded"
+  | "musicchange"
+  | "playlistchange";
 
 /**
  * 事件监听器

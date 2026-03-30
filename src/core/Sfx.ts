@@ -3,7 +3,7 @@
  * 可重叠播放的音频效果
  */
 
-import type { SFXOptions, SFXInstance } from '../types';
+import type { SFXInstance, SFXOptions } from "../types";
 
 export class SFX {
   private Config: SFXOptions = {
@@ -11,7 +11,7 @@ export class SFX {
     rate: 1,
     stopOnHidden: false,
     preload: false,
-    enable: true
+    enable: true,
   };
   private configProxy: SFXOptions;
   private ActiveInstances: Set<SFXInstance> = new Set();
@@ -49,20 +49,24 @@ export class SFX {
         // 处理配置变更
         this.handleConfigChange(prop as keyof SFXOptions, value, oldValue);
         return true;
-      }
+      },
     });
   }
 
-  private handleConfigChange(key: keyof SFXOptions, newValue: any, oldValue: any): void {
+  private handleConfigChange(
+    key: keyof SFXOptions,
+    newValue: any,
+    oldValue: any,
+  ): void {
     if (newValue === oldValue) return;
 
     switch (key) {
-      case 'enable':
+      case "enable":
         if (newValue === false) {
           this.stopAll();
         }
         break;
-      case 'stopOnHidden':
+      case "stopOnHidden":
         this.setupVisibilityHandler();
         break;
     }
@@ -71,7 +75,7 @@ export class SFX {
   private setupVisibilityHandler(): void {
     // 清理旧的监听器
     if (this.visibilityHandler) {
-      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
       this.visibilityHandler = null;
     }
 
@@ -85,7 +89,7 @@ export class SFX {
           this.blocked = false;
         }
       };
-      document.addEventListener('visibilitychange', this.visibilityHandler);
+      document.addEventListener("visibilitychange", this.visibilityHandler);
     }
   }
 
@@ -100,22 +104,18 @@ export class SFX {
       return;
     }
     return new Promise((resolve, reject) => {
-      const audio = new Audio(src);
+      let audio: HTMLAudioElement | null = new Audio(src);
+      this.Cache.set(id, src);
       const onLoad = () => {
-        this.Cache.set(id, src);
-        cleanup();
+        audio = null;
         resolve();
       };
       const onError = (e: ErrorEvent) => {
-        cleanup();
+        audio = null;
         reject(e);
       };
-      const cleanup = () => {
-        audio.removeEventListener('canplaythrough', onLoad);
-        audio.removeEventListener('error', onError);
-      };
-      audio.addEventListener('canplaythrough', onLoad, { once: true });
-      audio.addEventListener('error', onError, { once: true });
+      audio.addEventListener("canplaythrough", onLoad, { once: true });
+      audio.addEventListener("error", onError, { once: true });
       audio.load();
     });
   }
@@ -124,7 +124,10 @@ export class SFX {
    * 播放音效（每次创建新实例，支持重叠播放）
    * preload: false 时可直接传 src 而无需提前调用 load()
    */
-  async play(id: string, options: SFXOptions & { src?: string } = {}): Promise<void> {
+  async play(
+    id: string,
+    options: SFXOptions & { src?: string } = {},
+  ): Promise<void> {
     if (!this.Config.enable) {
       return;
     }
@@ -132,7 +135,9 @@ export class SFX {
 
     const src = options.src ?? this.Cache.get(id);
     if (!src) {
-      throw new Error(`SFX: "${id}" not found. Call load() first or pass { src } directly.`);
+      throw new Error(
+        `SFX: "${id}" not found. Call load() first or pass { src } directly.`,
+      );
     }
     // 按需缓存
     if (!this.Cache.has(id)) this.Cache.set(id, src);
@@ -153,16 +158,16 @@ export class SFX {
       stop() {
         audio.pause();
         audio.currentTime = 0;
-      }
+      },
     };
 
     this.ActiveInstances.add(instance);
 
-    audio.addEventListener('ended', () => {
+    audio.addEventListener("ended", () => {
       this.ActiveInstances.delete(instance);
     }, { once: true });
 
-    audio.addEventListener('error', () => {
+    audio.addEventListener("error", () => {
       this.ActiveInstances.delete(instance);
     }, { once: true });
 
@@ -178,7 +183,7 @@ export class SFX {
    * 停止所有正在播放的音效实例
    */
   stopAll(): void {
-    this.ActiveInstances.forEach(instance => instance.stop());
+    this.ActiveInstances.forEach((instance) => instance.stop());
     this.ActiveInstances.clear();
   }
 
@@ -186,7 +191,7 @@ export class SFX {
    * 停止指定 id 的所有音效实例
    */
   stop(id: string): void {
-    this.ActiveInstances.forEach(instance => {
+    this.ActiveInstances.forEach((instance) => {
       if (instance.id === id) {
         instance.stop();
         this.ActiveInstances.delete(instance);
@@ -201,11 +206,11 @@ export class SFX {
     return this.ActiveInstances.size;
   }
 
-  get config(): SFXOptions { 
-    return this.configProxy; 
+  get config(): SFXOptions {
+    return this.configProxy;
   }
   set config(newConfig: Partial<SFXOptions>) {
-    Object.keys(newConfig).forEach(key => {
+    Object.keys(newConfig).forEach((key) => {
       const k = key as keyof SFXOptions;
       if (newConfig[k] !== undefined) {
         (this.configProxy as any)[k] = newConfig[k];
@@ -218,7 +223,7 @@ export class SFX {
     this.ActiveInstances.clear();
     this.Cache.clear();
     if (this.visibilityHandler) {
-      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
       this.visibilityHandler = null;
     }
   }
