@@ -1,6 +1,6 @@
 {
   "name": "webaudiokit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A powerful, lightweight JavaScript library for web audio manipulation with comprehensive support for background music, sound effects, and advanced music playback features.",
   "license": "MIT",
   "author": "Roy-Jin",
