@@ -39,6 +39,7 @@ new BGM(options?: BGMOptions)
 | `fadeOut` | `number` | `0` | Fade out duration (ms) |
 | `stopOnHidden` | `boolean` | `false` | Auto-pause when page hidden |
 | `preload` | `boolean` | `false` | Preload audio files |
+| `enable` | `boolean` | `true` | Enable BGM (blocks all methods when false) |
 
 ### Methods
 
@@ -79,6 +80,8 @@ Clean up resources and remove event listeners.
 | `duration` | `number` | Total duration (seconds) |
 | `paused` | `boolean` | Whether playback is paused |
 | `playing` | `string \| null` | Currently playing track ID |
+| `enable` | `boolean` | Whether BGM is enabled |
+| `config` | `BGMOptions` | Get/set config (setter merges with existing, auto-handles stopOnHidden listener) |
 
 ### Events
 
@@ -112,6 +115,7 @@ new SFX(options?: SFXOptions)
 | `rate` | `number` | `1` | Default playback rate |
 | `stopOnHidden` | `boolean` | `false` | Stop all when page hidden |
 | `preload` | `boolean` | `false` | Preload audio files |
+| `enable` | `boolean` | `true` | Enable SFX (blocks all methods when false) |
 
 ### Methods
 
@@ -145,6 +149,8 @@ Clean up all resources.
 | Property | Type | Description |
 |----------|------|-------------|
 | `activeCount` | `number` | Number of currently playing instances |
+| `enable` | `boolean` | Whether SFX is enabled |
+| `config` | `SFXOptions` | Get/set config (setter merges with existing, auto-handles stopOnHidden listener) |
 
 ---
 
@@ -219,6 +225,7 @@ new MusicPlayer(options?: MusicPlayerOptions)
 | `fadeOut` | `number` | `0` | Fade out duration (ms) |
 | `stopOnHidden` | `boolean` | `false` | Auto-pause when page hidden |
 | `preload` | `boolean` | `true` | Preload next track |
+| `enable` | `boolean` | `true` | Enable player (blocks all methods when false) |
 
 ### Playlist Management
 
@@ -271,6 +278,8 @@ Play previous track according to play mode.
 | `currentIndex` | `number` | Current track index |
 | `playMode` | `PlayMode` | Current play mode |
 | `lyric` | `Lyric \| null` | Current lyric line |
+| `enable` | `boolean` | Whether player is enabled |
+| `config` | `MusicPlayerOptions` | Get/set config (setter merges with existing, auto-handles stopOnHidden listener and play mode) |
 
 ### Playlist Access
 

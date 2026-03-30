@@ -14,7 +14,15 @@ function resolveFadeMs(fade?: boolean, explicit?: number): number {
 }
 
 export class BGM {
-  private Config: BGMOptions = { loop: true, volume: 1, rate: 1, fadeIn: 0, fadeOut: 0, preload: false };
+  private Config: BGMOptions = {
+    loop: true,
+    volume: 1,
+    rate: 1,
+    fade: false,
+    preload: false,
+    stopOnHidden: false,
+    enable: true
+  };
   private Cache: Map<string, string> = new Map();
   private audio: HTMLAudioElement | null = null;
   private currentId: string | null = null;
@@ -30,9 +38,21 @@ export class BGM {
     if (options.loop !== undefined) this.Config.loop = options.loop;
     if (options.stopOnHidden !== undefined) this.Config.stopOnHidden = options.stopOnHidden;
     if (options.preload !== undefined) this.Config.preload = options.preload;
-    this.Config.fadeIn  = resolveFadeMs(options.fade, options.fadeIn);
+    if (options.enable !== undefined) this.Config.enable = options.enable;
+    this.Config.fadeIn = resolveFadeMs(options.fade, options.fadeIn);
     this.Config.fadeOut = resolveFadeMs(options.fade, options.fadeOut);
 
+    this.setupVisibilityHandler();
+  }
+
+  private setupVisibilityHandler(): void {
+    // 清理旧的监听器
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
+    // 如果启用 stopOnHidden，设置新的监听器
     if (this.Config.stopOnHidden) {
       this.visibilityHandler = () => {
         if (document.hidden) {
@@ -55,6 +75,7 @@ export class BGM {
   }
 
   async load(id: string, src: string): Promise<void> {
+    if (!this.Config.enable) return;
     if (!this.Config.preload) {
       // 非预加载模式：仅缓存 src
       this.Cache.set(id, src);
@@ -71,7 +92,7 @@ export class BGM {
   }
 
   async play(id: string): Promise<void> {
-    if (this.blocked) return;
+    if (!this.Config.enable || this.blocked) return;
 
     const src = this.Cache.get(id);
     if (!src) throw new Error(`BGM: "${id}" not found. Call load() first.`);
@@ -97,17 +118,18 @@ export class BGM {
   }
 
   pause(): void {
-    if (!this.audio) return;
+    if (!this.Config.enable || !this.audio) return;
     this.clearFade();
     this.audio.pause();
   }
 
   async resume(): Promise<void> {
-    if (this.blocked || !this.audio || !this.audio.paused) return;
+    if (!this.Config.enable || this.blocked || !this.audio || !this.audio.paused) return;
     await this.resumePlay();
   }
 
   stop(): void {
+    if (!this.Config.enable) return;
     this.clearFade();
     this.stopCurrent();
     this.pausedByHidden = false;
@@ -138,6 +160,22 @@ export class BGM {
   get duration(): number { return this.audio?.duration ?? 0; }
   get paused(): boolean { return this.audio?.paused ?? true; }
   get playing(): string | null { return this.currentId; }
+
+  get enable(): boolean { return this.Config.enable!; }
+  set enable(value: boolean) { this.Config.enable = value; }
+
+  get config(): BGMOptions { return { ...this.Config }; }
+  set config(newConfig: Partial<BGMOptions>) {
+    this.Config = { ...this.Config, ...newConfig };
+    // 应用新配置到当前播放的音频
+    if (this.audio) {
+      if (newConfig.volume !== undefined) this.audio.volume = Math.max(0, Math.min(1, newConfig.volume));
+      if (newConfig.rate !== undefined) this.audio.playbackRate = newConfig.rate;
+      if (newConfig.loop !== undefined) this.audio.loop = newConfig.loop;
+    }
+    // 如果 stopOnHidden 改变，重新设置监听器
+    if (newConfig.stopOnHidden !== undefined) this.setupVisibilityHandler();
+  }
 
   on(event: EventType, listener: EventListener): void {
     if (!this.eventListeners.has(event)) this.eventListeners.set(event, new Set());

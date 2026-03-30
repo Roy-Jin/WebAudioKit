@@ -16,6 +16,17 @@ function resolveFadeMs(fade?: boolean, explicit?: number): number {
 }
 
 export class MusicPlayer {
+  private Config: MusicPlayerOptions = {
+    volume: 1,
+    rate: 1,
+    loop: false,
+    fade: false,
+    stopOnHidden: false,
+    preload: true,
+    mode: PlayMode.SEQUENTIAL,
+    enable: true
+  };
+
   private audio: HTMLAudioElement | null = null;
   private eventListeners: Map<EventType, Set<EventListener>> = new Map();
   private _state: PlayState = PlayState.STOPPED;
@@ -23,33 +34,38 @@ export class MusicPlayer {
 
   private playlist: Music[] = [];
   private index: number = -1;
-  private mode: PlayMode = PlayMode.SEQUENTIAL;
   private shuffleOrder: number[] = [];
-
-  private defaultVolume: number = 1;
-  private defaultRate: number = 1;
-  private defaultLoop: boolean = false;
 
   private blocked: boolean = false;
   private pausedByHidden: boolean = false;
   private visibilityHandler: (() => void) | null = null;
-  private fadeInMs: number = 0;
-  private fadeOutMs: number = 0;
   private fadeTimer: number | null = null;
-  private enablePreload: boolean = true;
   private preloadAudio: HTMLAudioElement | null = null;
   private preloadSrc: string | null = null;
 
   constructor(options: MusicPlayerOptions = {}) {
-    if (options.volume !== undefined) this.defaultVolume = Math.max(0, Math.min(1, options.volume));
-    if (options.rate !== undefined) this.defaultRate = options.rate;
-    if (options.loop !== undefined) this.defaultLoop = options.loop;
-    if (options.mode !== undefined) this.mode = options.mode;
-    this.fadeInMs  = resolveFadeMs(options.fade, options.fadeIn);
-    this.fadeOutMs = resolveFadeMs(options.fade, options.fadeOut);
-    if (options.preload !== undefined) this.enablePreload = options.preload;
+    if (options.volume !== undefined) this.Config.volume = Math.max(0, Math.min(1, options.volume));
+    if (options.rate !== undefined) this.Config.rate = options.rate;
+    if (options.loop !== undefined) this.Config.loop = options.loop;
+    if (options.mode !== undefined) this.Config.mode = options.mode;
+    if (options.enable !== undefined) this.Config.enable = options.enable;
+    this.Config.fadeIn = resolveFadeMs(options.fade, options.fadeIn);
+    this.Config.fadeOut = resolveFadeMs(options.fade, options.fadeOut);
+    if (options.preload !== undefined) this.Config.preload = options.preload;
+    if (options.stopOnHidden !== undefined) this.Config.stopOnHidden = options.stopOnHidden;
 
-    if (options.stopOnHidden) {
+    this.setupVisibilityHandler();
+  }
+
+  private setupVisibilityHandler(): void {
+    // 清理旧的监听器
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
+    // 如果启用 stopOnHidden，设置新的监听器
+    if (this.Config.stopOnHidden) {
       this.visibilityHandler = () => {
         if (document.hidden) {
           this.blocked = true;
@@ -119,7 +135,7 @@ export class MusicPlayer {
   // ==================== 播放控制 ====================
 
   async play(idx?: number): Promise<void> {
-    if (this.blocked) return;
+    if (!this.Config.enable || this.blocked) return;
 
     if (idx !== undefined) {
       await this.loadAt(idx);
@@ -143,14 +159,14 @@ export class MusicPlayer {
   }
 
   pause(): void {
-    if (!this.audio) return;
+    if (!this.Config.enable || !this.audio) return;
     this.clearFade();
     this.pausedByHidden = false;
     this.audio.pause();
   }
 
   stop(): void {
-    if (!this.audio) return;
+    if (!this.Config.enable || !this.audio) return;
     this.clearFade();
     this.pausedByHidden = false;
     this.audio.pause();
@@ -160,12 +176,14 @@ export class MusicPlayer {
   }
 
   async playNext(): Promise<void> {
+    if (!this.Config.enable) return;
     const nextIdx = this.resolveNext();
     if (nextIdx === null) return;
     await this.loadAt(nextIdx);
   }
 
   async playPrev(): Promise<void> {
+    if (!this.Config.enable) return;
     const prevIdx = this.resolvePrev();
     if (prevIdx === null) return;
     await this.loadAt(prevIdx);
@@ -202,9 +220,9 @@ export class MusicPlayer {
       }
       this.audio = new Audio(music.url);
     }
-    this.audio.volume = this.defaultVolume;
-    this.audio.playbackRate = this.defaultRate;
-    this.audio.loop = this.defaultLoop;
+    this.audio.volume = this.Config.volume!;
+    this.audio.playbackRate = this.Config.rate!;
+    this.audio.loop = this.Config.loop!;
     this.index = idx;
     this.lyricIndex = -1;
     this._state = PlayState.LOADING;
@@ -225,7 +243,7 @@ export class MusicPlayer {
     }
 
     // 预加载下一首
-    if (this.enablePreload) this.preloadNext();
+    if (this.Config.preload) this.preloadNext();
   }
 
   private setupEvents(): void {
@@ -306,7 +324,7 @@ export class MusicPlayer {
   private resolveNext(): number | null {
     if (this.playlist.length === 0) return null;
 
-    switch (this.mode) {
+    switch (this.Config.mode) {
       case PlayMode.SINGLE:
         return this.index;
 
@@ -320,6 +338,9 @@ export class MusicPlayer {
 
       case PlayMode.SEQUENTIAL:
         return this.index < this.playlist.length - 1 ? this.index + 1 : null;
+
+      default:
+        return null;
     }
   }
 
@@ -329,7 +350,7 @@ export class MusicPlayer {
   private resolvePrev(): number | null {
     if (this.playlist.length === 0) return null;
 
-    switch (this.mode) {
+    switch (this.Config.mode) {
       case PlayMode.SINGLE:
         return this.index;
 
@@ -343,6 +364,9 @@ export class MusicPlayer {
 
       case PlayMode.SEQUENTIAL:
         return this.index > 0 ? this.index - 1 : null;
+
+      default:
+        return null;
     }
   }
 
@@ -375,22 +399,22 @@ export class MusicPlayer {
 
   // ==================== Getters & Setters ====================
 
-  get volume(): number { return this.audio?.volume ?? this.defaultVolume; }
+  get volume(): number { return this.audio?.volume ?? this.Config.volume!; }
   set volume(value: number) {
     const vol = Math.max(0, Math.min(1, value));
-    this.defaultVolume = vol;
+    this.Config.volume = vol;
     if (this.audio) { this.audio.volume = vol; this.emit('volumechange', vol); }
   }
 
-  get rate(): number { return this.audio?.playbackRate ?? this.defaultRate; }
+  get rate(): number { return this.audio?.playbackRate ?? this.Config.rate!; }
   set rate(value: number) {
-    this.defaultRate = value;
+    this.Config.rate = value;
     if (this.audio) this.audio.playbackRate = value;
   }
 
-  get loop(): boolean { return this.audio?.loop ?? this.defaultLoop; }
+  get loop(): boolean { return this.audio?.loop ?? this.Config.loop!; }
   set loop(value: boolean) {
-    this.defaultLoop = value;
+    this.Config.loop = value;
     if (this.audio) this.audio.loop = value;
   }
 
@@ -420,10 +444,31 @@ export class MusicPlayer {
     if (value >= 0 && value < this.playlist.length) this.index = value;
   }
 
-  get playMode(): PlayMode { return this.mode; }
+  get playMode(): PlayMode { return this.Config.mode!; }
   set playMode(value: PlayMode) {
-    this.mode = value;
+    this.Config.mode = value;
     if (value === PlayMode.SHUFFLE) this.rebuildShuffle();
+  }
+
+  get enable(): boolean { return this.Config.enable!; }
+  set enable(value: boolean) { this.Config.enable = value; }
+
+  get config(): MusicPlayerOptions { return { ...this.Config }; }
+  set config(newConfig: Partial<MusicPlayerOptions>) {
+    this.Config = { ...this.Config, ...newConfig };
+    
+    // 应用新配置到当前播放的音频
+    if (this.audio) {
+      if (newConfig.volume !== undefined) this.audio.volume = Math.max(0, Math.min(1, newConfig.volume));
+      if (newConfig.rate !== undefined) this.audio.playbackRate = newConfig.rate;
+      if (newConfig.loop !== undefined) this.audio.loop = newConfig.loop;
+    }
+    
+    // 如果播放模式改为随机，重建随机顺序
+    if (newConfig.mode === PlayMode.SHUFFLE) this.rebuildShuffle();
+    
+    // 如果 stopOnHidden 改变，重新设置监听器
+    if (newConfig.stopOnHidden !== undefined) this.setupVisibilityHandler();
   }
 
   get lyric(): Lyric | null {
@@ -470,15 +515,15 @@ export class MusicPlayer {
 
   private async execFadeIn(audio: HTMLAudioElement): Promise<void> {
     this.clearFade();
-    if (this.fadeInMs <= 0) {
+    if (this.Config.fadeIn! <= 0) {
       await audio.play();
       return;
     }
-    const target = this.defaultVolume;
+    const target = this.Config.volume!;
     audio.volume = 0;
     await audio.play();
     return new Promise((resolve) => {
-      const step = target / (this.fadeInMs / 50);
+      const step = target / (this.Config.fadeIn! / 50);
       let vol = 0;
       this.fadeTimer = window.setInterval(() => {
         vol += step;
@@ -489,11 +534,11 @@ export class MusicPlayer {
   }
 
   private async execFadeOut(audio: HTMLAudioElement): Promise<void> {
-    if (this.fadeOutMs <= 0) return;
+    if (this.Config.fadeOut! <= 0) return;
     this.clearFade();
     const start = audio.volume;
     return new Promise((resolve) => {
-      const step = start / (this.fadeOutMs / 50);
+      const step = start / (this.Config.fadeOut! / 50);
       let vol = start;
       this.fadeTimer = window.setInterval(() => {
         vol -= step;

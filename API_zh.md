@@ -39,6 +39,7 @@ new BGM(options?: BGMOptions)
 | `fadeOut` | `number` | `0` | 淡出时长 (毫秒) |
 | `stopOnHidden` | `boolean` | `false` | 页面隐藏时自动暂停 |
 | `preload` | `boolean` | `false` | 预加载音频文件 |
+| `enable` | `boolean` | `true` | 是否启用 BGM（为 false 时阻止所有方法） |
 
 ### 方法
 
@@ -79,6 +80,8 @@ await bgm.play('menu');
 | `duration` | `number` | 总时长 (秒) |
 | `paused` | `boolean` | 是否暂停 |
 | `playing` | `string \| null` | 当前播放的音轨 ID |
+| `enable` | `boolean` | 是否启用 BGM |
+| `config` | `BGMOptions` | 获取/设置配置（setter 使用合并方式，自动处理 stopOnHidden 监听器） |
 
 ### 事件
 
@@ -112,6 +115,7 @@ new SFX(options?: SFXOptions)
 | `rate` | `number` | `1` | 默认播放速率 |
 | `stopOnHidden` | `boolean` | `false` | 页面隐藏时停止所有音效 |
 | `preload` | `boolean` | `false` | 预加载音频文件 |
+| `enable` | `boolean` | `true` | 是否启用 SFX（为 false 时阻止所有方法） |
 
 ### 方法
 
@@ -145,6 +149,8 @@ await sfx.play('newSound', { src: 'sounds/new.wav' }); // 直接指定源文件
 | 属性 | 类型 | 描述 |
 |------|------|------|
 | `activeCount` | `number` | 当前播放的实例数量 |
+| `enable` | `boolean` | 是否启用 SFX |
+| `config` | `SFXOptions` | 获取/设置配置（setter 使用合并方式，自动处理 stopOnHidden 监听器） |
 
 ---
 
@@ -219,6 +225,7 @@ new MusicPlayer(options?: MusicPlayerOptions)
 | `fadeOut` | `number` | `0` | 淡出时长 (毫秒) |
 | `stopOnHidden` | `boolean` | `false` | 页面隐藏时自动暂停 |
 | `preload` | `boolean` | `true` | 预加载下一首 |
+| `enable` | `boolean` | `true` | 是否启用播放器（为 false 时阻止所有方法） |
 
 ### 播放列表管理
 
@@ -271,6 +278,8 @@ new MusicPlayer(options?: MusicPlayerOptions)
 | `currentIndex` | `number` | 当前曲目索引 |
 | `playMode` | `PlayMode` | 当前播放模式 |
 | `lyric` | `Lyric \| null` | 当前歌词行 |
+| `enable` | `boolean` | 是否启用播放器 |
+| `config` | `MusicPlayerOptions` | 获取/设置配置（setter 使用合并方式，自动处理 stopOnHidden 监听器和播放模式） |
 
 ### 播放列表访问
 

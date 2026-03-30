@@ -497,6 +497,125 @@ class PlaylistManager {
 
 ## Advanced Patterns
 
+### Enable/Disable Control
+
+```javascript
+// Use enable property to control audio playback
+const bgm = new BGM({ enable: true });
+const sfx = new SFX({ enable: true });
+const player = new MusicPlayer({ enable: true });
+
+// Dynamically disable/enable
+function toggleAudio(enabled) {
+  bgm.enable = enabled;
+  sfx.enable = enabled;
+  player.enable = enabled;
+}
+
+// Use in settings menu
+class AudioSettings {
+  constructor() {
+    this.bgm = new BGM();
+    this.sfx = new SFX();
+    this.player = new MusicPlayer();
+  }
+  
+  setBGMEnabled(enabled) {
+    this.bgm.enable = enabled;
+    localStorage.setItem('bgm-enabled', enabled);
+  }
+  
+  setSFXEnabled(enabled) {
+    this.sfx.enable = enabled;
+    localStorage.setItem('sfx-enabled', enabled);
+  }
+  
+  setMusicEnabled(enabled) {
+    this.player.enable = enabled;
+    localStorage.setItem('music-enabled', enabled);
+  }
+  
+  loadSettings() {
+    this.bgm.enable = localStorage.getItem('bgm-enabled') !== 'false';
+    this.sfx.enable = localStorage.getItem('sfx-enabled') !== 'false';
+    this.player.enable = localStorage.getItem('music-enabled') !== 'false';
+  }
+}
+```
+
+### Dynamic Configuration Updates
+
+```javascript
+// Use config getter/setter to dynamically modify configuration
+const player = new MusicPlayer({
+  volume: 0.8,
+  mode: PlayMode.SEQUENTIAL,
+  fadeIn: 500
+});
+
+// Get current configuration
+const currentConfig = player.config;
+console.log(currentConfig); // { volume: 0.8, mode: 'sequential', ... }
+
+// Update partial configuration (merge mode)
+player.config = {
+  volume: 0.5,
+  mode: PlayMode.SHUFFLE,
+  fadeOut: 1000,
+  stopOnHidden: true  // Dynamically enable pause on hidden
+};
+
+// BGM configuration update
+const bgm = new BGM({ volume: 0.7, loop: true });
+
+// Modify config at runtime
+bgm.config = {
+  volume: 0.5,
+  fadeIn: 1500,
+  fadeOut: 1000,
+  stopOnHidden: true  // Dynamically enable pause on hidden
+};
+
+// SFX configuration update
+const sfx = new SFX({ volume: 0.8 });
+
+sfx.config = {
+  volume: 0.6,
+  rate: 1.2,
+  stopOnHidden: false  // Dynamically disable stop on hidden
+};
+
+// Real-world example: User settings panel
+class UserSettings {
+  constructor(player) {
+    this.player = player;
+  }
+  
+  applySettings(settings) {
+    this.player.config = {
+      volume: settings.musicVolume,
+      mode: settings.playMode,
+      fadeIn: settings.enableFade ? 500 : 0,
+      fadeOut: settings.enableFade ? 500 : 0,
+      enable: settings.musicEnabled,
+      stopOnHidden: settings.pauseWhenHidden
+    };
+  }
+  
+  saveSettings() {
+    const config = this.player.config;
+    localStorage.setItem('player-settings', JSON.stringify(config));
+  }
+  
+  loadSettings() {
+    const saved = localStorage.getItem('player-settings');
+    if (saved) {
+      this.player.config = JSON.parse(saved);
+    }
+  }
+}
+```
+
 ### Audio Context Management
 
 ```javascript

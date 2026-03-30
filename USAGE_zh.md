@@ -388,6 +388,125 @@ class StreamingPlayer {
 
 ## 高级模式
 
+### 启用/禁用控制
+
+```javascript
+// 使用 enable 属性控制音频播放
+const bgm = new BGM({ enable: true });
+const sfx = new SFX({ enable: true });
+const player = new MusicPlayer({ enable: true });
+
+// 动态禁用/启用
+function toggleAudio(enabled) {
+  bgm.enable = enabled;
+  sfx.enable = enabled;
+  player.enable = enabled;
+}
+
+// 在设置菜单中使用
+class AudioSettings {
+  constructor() {
+    this.bgm = new BGM();
+    this.sfx = new SFX();
+    this.player = new MusicPlayer();
+  }
+  
+  setBGMEnabled(enabled) {
+    this.bgm.enable = enabled;
+    localStorage.setItem('bgm-enabled', enabled);
+  }
+  
+  setSFXEnabled(enabled) {
+    this.sfx.enable = enabled;
+    localStorage.setItem('sfx-enabled', enabled);
+  }
+  
+  setMusicEnabled(enabled) {
+    this.player.enable = enabled;
+    localStorage.setItem('music-enabled', enabled);
+  }
+  
+  loadSettings() {
+    this.bgm.enable = localStorage.getItem('bgm-enabled') !== 'false';
+    this.sfx.enable = localStorage.getItem('sfx-enabled') !== 'false';
+    this.player.enable = localStorage.getItem('music-enabled') !== 'false';
+  }
+}
+```
+
+### 动态配置更新
+
+```javascript
+// 使用 config getter/setter 动态修改配置
+const player = new MusicPlayer({
+  volume: 0.8,
+  mode: PlayMode.SEQUENTIAL,
+  fadeIn: 500
+});
+
+// 获取当前配置
+const currentConfig = player.config;
+console.log(currentConfig); // { volume: 0.8, mode: 'sequential', ... }
+
+// 更新部分配置（合并方式）
+player.config = {
+  volume: 0.5,
+  mode: PlayMode.SHUFFLE,
+  fadeOut: 1000,
+  stopOnHidden: true  // 动态启用页面隐藏暂停
+};
+
+// BGM 配置更新
+const bgm = new BGM({ volume: 0.7, loop: true });
+
+// 运行时修改配置
+bgm.config = {
+  volume: 0.5,
+  fadeIn: 1500,
+  fadeOut: 1000,
+  stopOnHidden: true  // 动态启用页面隐藏暂停
+};
+
+// SFX 配置更新
+const sfx = new SFX({ volume: 0.8 });
+
+sfx.config = {
+  volume: 0.6,
+  rate: 1.2,
+  stopOnHidden: false  // 动态禁用页面隐藏停止
+};
+
+// 实际应用：用户设置面板
+class UserSettings {
+  constructor(player) {
+    this.player = player;
+  }
+  
+  applySettings(settings) {
+    this.player.config = {
+      volume: settings.musicVolume,
+      mode: settings.playMode,
+      fadeIn: settings.enableFade ? 500 : 0,
+      fadeOut: settings.enableFade ? 500 : 0,
+      enable: settings.musicEnabled,
+      stopOnHidden: settings.pauseWhenHidden
+    };
+  }
+  
+  saveSettings() {
+    const config = this.player.config;
+    localStorage.setItem('player-settings', JSON.stringify(config));
+  }
+  
+  loadSettings() {
+    const saved = localStorage.getItem('player-settings');
+    if (saved) {
+      this.player.config = JSON.parse(saved);
+    }
+  }
+}
+```
+
 ### 音频上下文管理
 
 ```javascript

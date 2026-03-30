@@ -6,7 +6,13 @@
 import type { SFXOptions, SFXInstance } from '../types';
 
 export class SFX {
-  private Config: SFXOptions = { preload: false };
+  private Config: SFXOptions = {
+    volume: 1,
+    rate: 1,
+    stopOnHidden: false,
+    preload: false,
+    enable: true
+  };
   private ActiveInstances: Set<SFXInstance> = new Set();
   private Cache: Map<string, string> = new Map(); // id -> src
   private visibilityHandler: (() => void) | null = null;
@@ -25,7 +31,21 @@ export class SFX {
     if (options.preload !== undefined) {
       this.Config.preload = options.preload;
     }
+    if (options.enable !== undefined) {
+      this.Config.enable = options.enable;
+    }
 
+    this.setupVisibilityHandler();
+  }
+
+  private setupVisibilityHandler(): void {
+    // 清理旧的监听器
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
+    // 如果启用 stopOnHidden，设置新的监听器
     if (this.Config.stopOnHidden) {
       this.visibilityHandler = () => {
         if (document.hidden) {
@@ -43,6 +63,7 @@ export class SFX {
    * 预加载音效资源（preload: true 时建议提前调用；preload: false 时可跳过）
    */
   async load(id: string, src: string): Promise<void> {
+    if (!this.Config.enable) return;
     if (!this.Config.preload) {
       // 非预加载模式：仅缓存 src，不触发网络请求
       this.Cache.set(id, src);
@@ -74,7 +95,7 @@ export class SFX {
    * preload: false 时可直接传 src 而无需提前调用 load()
    */
   async play(id: string, options: SFXOptions & { src?: string } = {}): Promise<void> {
-    if (this.blocked) return;
+    if (!this.Config.enable || this.blocked) return;
 
     const src = options.src ?? this.Cache.get(id);
     if (!src) {
@@ -124,6 +145,7 @@ export class SFX {
    * 停止所有正在播放的音效实例
    */
   stopAll(): void {
+    if (!this.Config.enable) return;
     this.ActiveInstances.forEach(instance => instance.stop());
     this.ActiveInstances.clear();
   }
@@ -132,6 +154,7 @@ export class SFX {
    * 停止指定 id 的所有音效实例
    */
   stop(id: string): void {
+    if (!this.Config.enable) return;
     this.ActiveInstances.forEach(instance => {
       if (instance.id === id) {
         instance.stop();
@@ -145,6 +168,16 @@ export class SFX {
    */
   get activeCount(): number {
     return this.ActiveInstances.size;
+  }
+
+  get enable(): boolean { return this.Config.enable!; }
+  set enable(value: boolean) { this.Config.enable = value; }
+
+  get config(): SFXOptions { return { ...this.Config }; }
+  set config(newConfig: Partial<SFXOptions>) {
+    this.Config = { ...this.Config, ...newConfig };
+    // 如果 stopOnHidden 改变，重新设置监听器
+    if (newConfig.stopOnHidden !== undefined) this.setupVisibilityHandler();
   }
 
   destroy(): void {
