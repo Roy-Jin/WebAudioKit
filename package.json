@@ -1,6 +1,6 @@
 {
   "name": "webaudiokit",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "WebAudioKit is a JavaScript library for creating and manipulating audio signals using the WebAudio API.",
   "license": "MIT",
   "author": "Roy-Jin",

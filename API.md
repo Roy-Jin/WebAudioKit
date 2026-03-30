@@ -1,20 +1,25 @@
 # API Reference
 
-Complete API documentation for WebAudioKit.
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
+
+[English](API.md) | [中文](API_zh.md)
+
+Complete API documentation for WebAudioKit library.
 
 ## Table of Contents
 
-- [BGM](#bgm)
-- [SFX](#sfx)
-- [Music](#music)
-- [MusicPlayer](#musicplayer)
-- [Types](#types)
+- [BGM Class](#bgm-class)
+- [SFX Class](#sfx-class)
+- [Music Class](#music-class)
+- [MusicPlayer Class](#musicplayer-class)
+- [Types & Enums](#types--enums)
+- [Events](#events)
 
 ---
 
-## BGM
+## BGM Class
 
-Background music manager with fade in/out effects. Does not support overlapping playback.
+Background music manager with fade effects and smooth transitions.
 
 ### Constructor
 
@@ -22,139 +27,74 @@ Background music manager with fade in/out effects. Does not support overlapping 
 new BGM(options?: BGMOptions)
 ```
 
-**Options:**
-- `volume?: number` - Initial volume (0-1), default: 1
-- `rate?: number` - Playback rate, default: 1
-- `loop?: boolean` - Loop playback, default: true
-- `fadeIn?: number` - Fade in duration in milliseconds, default: 0
-- `fadeOut?: number` - Fade out duration in milliseconds, default: 0
+#### BGMOptions
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `volume` | `number` | `1` | Default volume (0-1) |
+| `rate` | `number` | `1` | Playback rate |
+| `loop` | `boolean` | `true` | Enable looping |
+| `fade` | `boolean` | `false` | Enable default fade (1000ms) |
+| `fadeIn` | `number` | `0` | Fade in duration (ms) |
+| `fadeOut` | `number` | `0` | Fade out duration (ms) |
+| `stopOnHidden` | `boolean` | `false` | Auto-pause when page hidden |
+| `preload` | `boolean` | `false` | Preload audio files |
 
 ### Methods
 
-#### load(src: string): Promise\<void\>
-Preload BGM resource.
+#### `load(id: string, src: string): Promise<void>`
+Load an audio file with the given ID.
 
 ```javascript
-await bgm.load('music/background.mp3');
+await bgm.load('menu', 'music/menu.mp3');
 ```
 
-#### play(): Promise\<void\>
-Play the loaded BGM. Applies fade in effect if configured.
+#### `play(id: string): Promise<void>`
+Play the audio file with the given ID. Automatically fades out current track if playing.
 
 ```javascript
-await bgm.play();
+await bgm.play('menu');
 ```
 
-#### pause(): void
-Pause playback.
+#### `pause(): void`
+Pause the current playback.
 
-```javascript
-bgm.pause();
-```
+#### `resume(): Promise<void>`
+Resume paused playback with fade in effect.
 
-#### stop(): void
-Stop playback and reset to beginning. Applies fade out effect if configured.
+#### `stop(): void`
+Stop playback and reset position.
 
-```javascript
-bgm.stop();
-```
-
-#### switch(src: string): Promise\<void\>
-Switch to a new BGM source with fade transition.
-
-```javascript
-await bgm.switch('music/new-background.mp3');
-```
-
-#### destroy(): void
-Clean up resources and remove all event listeners.
-
-```javascript
-bgm.destroy();
-```
+#### `destroy(): void`
+Clean up resources and remove event listeners.
 
 ### Properties
 
-#### volume: number
-Get or set volume (0-1).
-
-```javascript
-bgm.volume = 0.5;
-console.log(bgm.volume); // 0.5
-```
-
-#### currentTime: number
-Get or set current playback position in seconds.
-
-```javascript
-bgm.currentTime = 30; // Jump to 30 seconds
-```
-
-#### duration: number (readonly)
-Get total duration in seconds.
-
-```javascript
-console.log(bgm.duration);
-```
-
-#### paused: boolean (readonly)
-Check if BGM is paused.
-
-```javascript
-if (bgm.paused) {
-  await bgm.play();
-}
-```
-
-#### loop: boolean
-Get or set loop mode.
-
-```javascript
-bgm.loop = false;
-```
-
-#### rate: number
-Get or set playback rate.
-
-```javascript
-bgm.rate = 1.5; // 1.5x speed
-```
-
-#### loaded: boolean (readonly)
-Check if BGM is loaded.
-
-```javascript
-if (bgm.loaded) {
-  await bgm.play();
-}
-```
+| Property | Type | Description |
+|----------|------|-------------|
+| `volume` | `number` | Current volume (0-1) |
+| `rate` | `number` | Current playback rate |
+| `loop` | `boolean` | Loop enabled |
+| `currentTime` | `number` | Current playback position (seconds) |
+| `duration` | `number` | Total duration (seconds) |
+| `paused` | `boolean` | Whether playback is paused |
+| `playing` | `string \| null` | Currently playing track ID |
 
 ### Events
 
-#### on(event: EventType, listener: EventListener): void
-Add event listener.
-
 ```javascript
-bgm.on('play', () => console.log('BGM started'));
-bgm.on('ended', () => console.log('BGM ended'));
+bgm.on('play', () => console.log('Started'));
+bgm.on('pause', () => console.log('Paused'));
+bgm.on('stop', () => console.log('Stopped'));
+bgm.on('ended', () => console.log('Ended'));
+bgm.on('timeupdate', (data) => console.log(data.currentTime));
+bgm.on('volumechange', (volume) => console.log(volume));
+bgm.on('error', (error) => console.error(error));
 ```
-
-#### off(event: EventType, listener: EventListener): void
-Remove event listener.
-
-**Available Events:**
-- `play` - Playback started
-- `pause` - Playback paused
-- `stop` - Playback stopped
-- `ended` - Playback ended naturally
-- `timeupdate` - Time updated (provides `{currentTime, duration}`)
-- `volumechange` - Volume changed
-- `error` - Error occurred
-- `loaded` - Resource loaded
 
 ---
 
-## SFX
+## SFX Class
 
 Sound effects manager supporting overlapping playback.
 
@@ -164,147 +104,99 @@ Sound effects manager supporting overlapping playback.
 new SFX(options?: SFXOptions)
 ```
 
-**Options:**
-- `volume?: number` - Initial volume (0-1), default: 1
-- `rate?: number` - Playback rate, default: 1
+#### SFXOptions
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `volume` | `number` | `1` | Default volume (0-1) |
+| `rate` | `number` | `1` | Default playback rate |
+| `stopOnHidden` | `boolean` | `false` | Stop all when page hidden |
+| `preload` | `boolean` | `false` | Preload audio files |
 
 ### Methods
 
-#### load(src: string): Promise\<void\>
-Preload sound effect resource.
+#### `load(id: string, src: string): Promise<void>`
+Load a sound effect with the given ID.
 
 ```javascript
-await sfx.load('sounds/click.mp3');
+await sfx.load('click', 'sounds/click.wav');
 ```
 
-#### play(): Promise\<void\>
-Play the sound effect. Creates a new instance each time, allowing overlapping playback.
+#### `play(id: string, options?: SFXOptions & { src?: string }): Promise<void>`
+Play a sound effect. Creates a new instance for each call, allowing overlapping.
 
 ```javascript
-await sfx.play();
-await sfx.play(); // Can play simultaneously
+await sfx.play('click');
+await sfx.play('click', { volume: 0.5 }); // Custom volume
+await sfx.play('newSound', { src: 'sounds/new.wav' }); // Direct src
 ```
 
-#### stopAll(): void
+#### `stop(id: string): void`
+Stop all instances of a specific sound effect.
+
+#### `stopAll(): void`
 Stop all active sound effect instances.
 
-```javascript
-sfx.stopAll();
-```
-
-#### destroy(): void
-Clean up all resources and remove event listeners.
-
-```javascript
-sfx.destroy();
-```
+#### `destroy(): void`
+Clean up all resources.
 
 ### Properties
 
-#### volume: number
-Get or set volume (0-1). Affects all active and future instances.
-
-```javascript
-sfx.volume = 0.8;
-```
-
-#### rate: number
-Get or set playback rate. Affects all active and future instances.
-
-```javascript
-sfx.rate = 1.2;
-```
-
-#### activeCount: number (readonly)
-Get number of currently playing instances.
-
-```javascript
-console.log(sfx.activeCount); // 3
-```
-
-#### loaded: boolean (readonly)
-Check if sound effect is loaded.
-
-```javascript
-if (sfx.loaded) {
-  await sfx.play();
-}
-```
-
-### Events
-
-Same event system as BGM:
-- `play` - Instance started playing
-- `ended` - Instance finished playing
-- `stop` - All instances stopped
-- `volumechange` - Volume changed
-- `error` - Error occurred
-- `loaded` - Resource loaded
+| Property | Type | Description |
+|----------|------|-------------|
+| `activeCount` | `number` | Number of currently playing instances |
 
 ---
 
-## Music
+## Music Class
 
 Represents a single music track with metadata and lyrics.
 
 ### Constructor
 
 ```typescript
-new Music(src: string, metadata?: Metadata)
+new Music(src: string, metadata?: Metadata, lrcUrl?: string | null)
 ```
 
-```javascript
-const music = new Music('songs/song.mp3', {
-  title: 'Song Title',
-  artist: 'Artist Name',
-  album: 'Album Name',
-  cover: 'covers/cover.jpg',
-  lrc: '[00:00.00]Lyrics line 1\n[00:05.00]Lyrics line 2'
-});
-```
+#### Metadata
 
-### Properties
-
-#### url: string (readonly)
-Get the audio source URL.
-
-```javascript
-console.log(music.url);
-```
-
-#### meta: Metadata
-Get or set metadata. Setting new metadata merges with existing data.
-
-```javascript
-music.meta = { artist: 'New Artist' };
-console.log(music.meta);
-```
+| Property | Type | Description |
+|----------|------|-------------|
+| `title` | `string` | Track title |
+| `artist` | `string` | Artist name |
+| `album` | `string` | Album name |
+| `cover` | `string` | Cover image URL |
+| `lrc` | `string` | LRC lyrics text |
+| `duration` | `number` | Track duration (seconds) |
 
 ### Methods
 
-#### getLyrics(): Lyric[]
-Get all parsed lyrics.
+#### `loadLyrics(): Promise<void>`
+Load lyrics from the LRC URL (lazy loading).
 
-```javascript
-const lyrics = music.getLyrics();
-// [{ time: 0, text: 'Lyrics line 1' }, ...]
-```
+#### `getLyrics(): Lyric[]`
+Get parsed lyrics array.
 
-#### getLyricAt(time: number): Lyric | null
-Get the lyric at a specific time.
+#### `getLyricAt(time: number): Lyric | null`
+Get lyric at specific time position.
 
-```javascript
-const lyric = music.getLyricAt(5.5);
-console.log(lyric?.text);
-```
+### Properties
 
-### Events
+| Property | Type | Description |
+|----------|------|-------------|
+| `url` | `string` | Audio file URL |
+| `meta` | `Metadata` | Track metadata |
+| `hasLyrics` | `boolean` | Whether lyrics are available |
+| `lyricsReady` | `boolean` | Whether lyrics are loaded |
 
-- `lyricsloaded` - Lyrics parsed successfully
+### Static Methods
+
+#### `Music.parseLyrics(text: string): Lyric[]`
+Parse LRC format lyrics text.
 
 ---
 
-## MusicPlayer
+## MusicPlayer Class
 
 Full-featured music player with playlist management.
 
@@ -314,245 +206,102 @@ Full-featured music player with playlist management.
 new MusicPlayer(options?: MusicPlayerOptions)
 ```
 
-**Options:**
-- `volume?: number` - Initial volume (0-1), default: 1
-- `rate?: number` - Playback rate, default: 1
-- `loop?: boolean` - Loop current track, default: false
-- `mode?: PlayMode` - Play mode, default: PlayMode.SEQUENTIAL
+#### MusicPlayerOptions
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `volume` | `number` | `1` | Default volume (0-1) |
+| `rate` | `number` | `1` | Playback rate |
+| `loop` | `boolean` | `false` | Enable track looping |
+| `mode` | `PlayMode` | `SEQUENTIAL` | Play mode |
+| `fade` | `boolean` | `false` | Enable default fade (1000ms) |
+| `fadeIn` | `number` | `0` | Fade in duration (ms) |
+| `fadeOut` | `number` | `0` | Fade out duration (ms) |
+| `stopOnHidden` | `boolean` | `false` | Auto-pause when page hidden |
+| `preload` | `boolean` | `true` | Preload next track |
 
 ### Playlist Management
 
-#### add(music: Music): void
+#### `add(music: Music): void`
 Add a music track to the playlist.
 
-```javascript
-const music = new Music('song.mp3', { title: 'Song' });
-player.add(music);
-```
+#### `addList(musicList: Music[]): void`
+Add multiple tracks to the playlist.
 
-#### addList(musicList: Music[]): void
-Add multiple tracks at once.
+#### `addFromMeting(data: MetingData[]): Promise<void>`
+Add tracks from Meting API response.
 
-```javascript
-player.addList([music1, music2, music3]);
-```
-
-#### addFromMeting(data: MetingData[]): Promise\<void\>
-Add tracks from Meting API format data.
-
-```javascript
-await player.addFromMeting(metingApiResponse);
-```
-
-#### remove(idx: number): void
+#### `remove(idx: number): void`
 Remove track at index.
 
-```javascript
-player.remove(0);
-```
-
-#### clear(): void
+#### `clear(): void`
 Clear the entire playlist.
-
-```javascript
-player.clear();
-```
-
-#### get(idx: number): Music | null
-Get track at index.
-
-```javascript
-const music = player.get(0);
-```
-
-#### getAll(): Music[]
-Get all tracks in playlist.
-
-```javascript
-const allMusic = player.getAll();
-```
 
 ### Playback Control
 
-#### play(idx?: number): Promise\<void\>
-Play music. If index provided, plays that track.
+#### `play(idx?: number): Promise<void>`
+Start playback. If index provided, plays that track.
 
-```javascript
-await player.play(); // Play current
-await player.play(2); // Play track at index 2
-```
-
-#### pause(): void
+#### `pause(): void`
 Pause playback.
 
-```javascript
-player.pause();
-```
-
-#### stop(): void
+#### `stop(): void`
 Stop playback and reset position.
 
-```javascript
-player.stop();
-```
+#### `playNext(): Promise<void>`
+Play next track according to play mode.
 
-#### playNext(): Promise\<void\>
-Play next track based on play mode.
-
-```javascript
-await player.playNext();
-```
-
-#### playPrev(): Promise\<void\>
-Play previous track based on play mode.
-
-```javascript
-await player.playPrev();
-```
-
-#### next(): Music | null
-Get next track without playing.
-
-```javascript
-const nextMusic = player.next();
-```
-
-#### prev(): Music | null
-Get previous track without playing.
-
-```javascript
-const prevMusic = player.prev();
-```
+#### `playPrev(): Promise<void>`
+Play previous track according to play mode.
 
 ### Properties
 
-#### volume: number
-Get or set volume (0-1).
+| Property | Type | Description |
+|----------|------|-------------|
+| `volume` | `number` | Current volume (0-1) |
+| `rate` | `number` | Current playback rate |
+| `loop` | `boolean` | Track loop enabled |
+| `currentTime` | `number` | Current position (seconds) |
+| `duration` | `number` | Current track duration |
+| `paused` | `boolean` | Whether paused |
+| `state` | `PlayState` | Current player state |
+| `progress` | `number` | Playback progress (0-1) |
+| `current` | `Music \| null` | Currently loaded track |
+| `length` | `number` | Playlist length |
+| `currentIndex` | `number` | Current track index |
+| `playMode` | `PlayMode` | Current play mode |
+| `lyric` | `Lyric \| null` | Current lyric line |
 
-```javascript
-player.volume = 0.7;
-```
+### Playlist Access
 
-#### currentTime: number
-Get or set current playback position in seconds.
+#### `get(idx: number): Music | null`
+Get track at index.
 
-```javascript
-player.currentTime = 60;
-```
+#### `getAll(): Music[]`
+Get copy of entire playlist.
 
-#### duration: number (readonly)
-Get current track duration.
-
-```javascript
-console.log(player.duration);
-```
-
-#### progress: number
-Get or set playback progress (0-1).
-
-```javascript
-player.progress = 0.5; // Jump to 50%
-```
-
-#### paused: boolean (readonly)
-Check if player is paused.
-
-```javascript
-if (player.paused) {
-  await player.play();
-}
-```
-
-#### loop: boolean
-Get or set loop mode for current track.
-
-```javascript
-player.loop = true;
-```
-
-#### rate: number
-Get or set playback rate.
-
-```javascript
-player.rate = 1.25;
-```
-
-#### state: PlayState (readonly)
-Get current player state.
-
-```javascript
-console.log(player.state); // 'playing', 'paused', 'stopped', 'loading', 'error'
-```
-
-#### current: Music | null (readonly)
-Get currently playing music.
-
-```javascript
-const current = player.current;
-console.log(current?.meta.title);
-```
-
-#### currentIndex: number
-Get or set current track index.
-
-```javascript
-player.currentIndex = 3;
-```
-
-#### length: number (readonly)
-Get playlist length.
-
-```javascript
-console.log(player.length);
-```
-
-#### playMode: PlayMode
-Get or set play mode.
-
-```javascript
-player.playMode = PlayMode.SHUFFLE;
-```
-
-#### lyric: Lyric | null (readonly)
-Get current lyric line.
-
-```javascript
-const lyric = player.lyric;
-console.log(lyric?.text);
-```
-
-### Methods
-
-#### getLyrics(): Lyric[]
-Get all lyrics of current track.
-
-```javascript
-const lyrics = player.getLyrics();
-```
-
-#### destroy(): void
-Clean up all resources.
-
-```javascript
-player.destroy();
-```
+#### `getLyrics(): Lyric[]`
+Get lyrics of current track.
 
 ### Events
 
-- `play` - Playback started
-- `pause` - Playback paused
-- `stop` - Playback stopped
-- `ended` - Track ended
-- `timeupdate` - Time updated (provides `{currentTime, duration}`)
-- `volumechange` - Volume changed
-- `error` - Error occurred
-- `musicchange` - Current track changed (provides Music object)
-- `playlistchange` - Playlist modified
-- `lyricchange` - Current lyric line changed (provides Lyric object)
+```javascript
+player.on('play', () => console.log('Playing'));
+player.on('pause', () => console.log('Paused'));
+player.on('stop', () => console.log('Stopped'));
+player.on('ended', () => console.log('Track ended'));
+player.on('musicchange', (music) => console.log('Track changed:', music));
+player.on('timeupdate', (data) => console.log(data.currentTime, data.duration));
+player.on('lyricchange', (lyric) => console.log('Lyric:', lyric?.text));
+player.on('lyricsloaded', () => console.log('Lyrics loaded'));
+player.on('playlistchange', () => console.log('Playlist updated'));
+player.on('volumechange', (volume) => console.log('Volume:', volume));
+player.on('error', (error) => console.error(error));
+```
 
 ---
 
-## Types
+## Types & Enums
 
 ### PlayMode
 
@@ -561,7 +310,7 @@ enum PlayMode {
   LOOP = 'loop',           // Loop entire playlist
   SHUFFLE = 'shuffle',     // Random order
   SINGLE = 'single',       // Repeat single track
-  SEQUENTIAL = 'sequential' // Play once through
+  SEQUENTIAL = 'sequential' // Play once in order
 }
 ```
 
@@ -577,25 +326,22 @@ enum PlayState {
 }
 ```
 
-### Metadata
-
-```typescript
-interface Metadata {
-  title?: string;
-  artist?: string;
-  album?: string;
-  cover?: string;
-  lrc?: string;
-  duration?: number;
-}
-```
-
 ### Lyric
 
 ```typescript
 interface Lyric {
-  time: number;  // Time in seconds
+  time: number;  // Timestamp in seconds
   text: string;  // Lyric text
+}
+```
+
+### SFXInstance
+
+```typescript
+interface SFXInstance {
+  audio: HTMLAudioElement;
+  id: string;
+  stop(): void;
 }
 ```
 
@@ -616,3 +362,83 @@ interface MetingData {
   lyric?: string;
 }
 ```
+
+### EventType
+
+```typescript
+type EventType = 
+  | 'play'
+  | 'pause'
+  | 'stop'
+  | 'ended'
+  | 'timeupdate'
+  | 'volumechange'
+  | 'error'
+  | 'loaded'
+  | 'lyricchange'
+  | 'lyricsloaded'
+  | 'musicchange'
+  | 'playlistchange';
+```
+
+---
+
+## Events
+
+All classes support event listening with `on()` and `off()` methods:
+
+```typescript
+// Add event listener
+instance.on(event: EventType, listener: EventListener): void
+
+// Remove event listener  
+instance.off(event: EventType, listener: EventListener): void
+
+// Event listener function
+type EventListener = (data?: any) => void
+```
+
+### Common Events
+
+- **`play`** - Playback started
+- **`pause`** - Playback paused
+- **`stop`** - Playback stopped
+- **`ended`** - Track/audio ended
+- **`timeupdate`** - Playback position updated
+- **`volumechange`** - Volume changed
+- **`error`** - Error occurred
+
+### MusicPlayer Specific Events
+
+- **`musicchange`** - Current track changed
+- **`lyricchange`** - Current lyric line changed
+- **`lyricsloaded`** - Lyrics finished loading
+- **`playlistchange`** - Playlist modified
+
+---
+
+## Error Handling
+
+All async methods can throw errors. Always use try-catch:
+
+```javascript
+try {
+  await player.play();
+} catch (error) {
+  console.error('Playback failed:', error);
+}
+
+// Or handle via events
+player.on('error', (error) => {
+  console.error('Player error:', error);
+});
+```
+
+## Best Practices
+
+1. **Always handle errors** - Use try-catch or error events
+2. **Clean up resources** - Call `destroy()` when done
+3. **Preload wisely** - Enable preloading for better UX, but consider bandwidth
+4. **Handle page visibility** - Use `stopOnHidden` for better mobile experience
+5. **Fade effects** - Use fade in/out for smooth transitions
+6. **Event listeners** - Remove listeners when components unmount

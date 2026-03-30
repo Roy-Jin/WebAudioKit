@@ -1,20 +1,25 @@
 # API 参考文档
 
-WebAudioKit 完整 API 文档。
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
+
+[English](API.md) | [中文](API_zh.md)
+
+WebAudioKit 库的完整 API 文档。
 
 ## 目录
 
-- [BGM](#bgm)
-- [SFX](#sfx)
-- [Music](#music)
-- [MusicPlayer](#musicplayer)
-- [类型定义](#类型定义)
+- [BGM 类](#bgm-类)
+- [SFX 类](#sfx-类)
+- [Music 类](#music-类)
+- [MusicPlayer 类](#musicplayer-类)
+- [类型和枚举](#类型和枚举)
+- [事件](#事件)
 
 ---
 
-## BGM
+## BGM 类
 
-背景音乐管理器，支持淡入淡出效果。不支持重叠播放。
+背景音乐管理器，支持淡入淡出效果和平滑过渡。
 
 ### 构造函数
 
@@ -22,139 +27,74 @@ WebAudioKit 完整 API 文档。
 new BGM(options?: BGMOptions)
 ```
 
-**配置选项：**
-- `volume?: number` - 初始音量 (0-1)，默认：1
-- `rate?: number` - 播放速率，默认：1
-- `loop?: boolean` - 循环播放，默认：true
-- `fadeIn?: number` - 淡入时长（毫秒），默认：0
-- `fadeOut?: number` - 淡出时长（毫秒），默认：0
+#### BGMOptions
+
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `volume` | `number` | `1` | 默认音量 (0-1) |
+| `rate` | `number` | `1` | 播放速率 |
+| `loop` | `boolean` | `true` | 启用循环播放 |
+| `fade` | `boolean` | `false` | 启用默认淡入淡出 (1000ms) |
+| `fadeIn` | `number` | `0` | 淡入时长 (毫秒) |
+| `fadeOut` | `number` | `0` | 淡出时长 (毫秒) |
+| `stopOnHidden` | `boolean` | `false` | 页面隐藏时自动暂停 |
+| `preload` | `boolean` | `false` | 预加载音频文件 |
 
 ### 方法
 
-#### load(src: string): Promise\<void\>
-预加载 BGM 资源。
+#### `load(id: string, src: string): Promise<void>`
+使用给定 ID 加载音频文件。
 
 ```javascript
-await bgm.load('music/background.mp3');
+await bgm.load('menu', 'music/menu.mp3');
 ```
 
-#### play(): Promise\<void\>
-播放已加载的 BGM。如果配置了淡入效果会自动应用。
+#### `play(id: string): Promise<void>`
+播放指定 ID 的音频文件。如果正在播放其他音频，会自动淡出当前音频。
 
 ```javascript
-await bgm.play();
+await bgm.play('menu');
 ```
 
-#### pause(): void
-暂停播放。
+#### `pause(): void`
+暂停当前播放。
 
-```javascript
-bgm.pause();
-```
+#### `resume(): Promise<void>`
+恢复暂停的播放，带淡入效果。
 
-#### stop(): void
-停止播放并重置到开头。如果配置了淡出效果会自动应用。
+#### `stop(): void`
+停止播放并重置位置。
 
-```javascript
-bgm.stop();
-```
-
-#### switch(src: string): Promise\<void\>
-切换到新的 BGM 源，带淡入淡出过渡。
-
-```javascript
-await bgm.switch('music/new-background.mp3');
-```
-
-#### destroy(): void
-清理资源并移除所有事件监听器。
-
-```javascript
-bgm.destroy();
-```
+#### `destroy(): void`
+清理资源并移除事件监听器。
 
 ### 属性
 
-#### volume: number
-获取或设置音量 (0-1)。
-
-```javascript
-bgm.volume = 0.5;
-console.log(bgm.volume); // 0.5
-```
-
-#### currentTime: number
-获取或设置当前播放位置（秒）。
-
-```javascript
-bgm.currentTime = 30; // 跳转到 30 秒
-```
-
-#### duration: number (只读)
-获取总时长（秒）。
-
-```javascript
-console.log(bgm.duration);
-```
-
-#### paused: boolean (只读)
-检查 BGM 是否暂停。
-
-```javascript
-if (bgm.paused) {
-  await bgm.play();
-}
-```
-
-#### loop: boolean
-获取或设置循环模式。
-
-```javascript
-bgm.loop = false;
-```
-
-#### rate: number
-获取或设置播放速率。
-
-```javascript
-bgm.rate = 1.5; // 1.5 倍速
-```
-
-#### loaded: boolean (只读)
-检查 BGM 是否已加载。
-
-```javascript
-if (bgm.loaded) {
-  await bgm.play();
-}
-```
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `volume` | `number` | 当前音量 (0-1) |
+| `rate` | `number` | 当前播放速率 |
+| `loop` | `boolean` | 是否启用循环 |
+| `currentTime` | `number` | 当前播放位置 (秒) |
+| `duration` | `number` | 总时长 (秒) |
+| `paused` | `boolean` | 是否暂停 |
+| `playing` | `string \| null` | 当前播放的音轨 ID |
 
 ### 事件
 
-#### on(event: EventType, listener: EventListener): void
-添加事件监听器。
-
 ```javascript
-bgm.on('play', () => console.log('BGM 开始播放'));
-bgm.on('ended', () => console.log('BGM 播放结束'));
+bgm.on('play', () => console.log('开始播放'));
+bgm.on('pause', () => console.log('已暂停'));
+bgm.on('stop', () => console.log('已停止'));
+bgm.on('ended', () => console.log('播放结束'));
+bgm.on('timeupdate', (data) => console.log(data.currentTime));
+bgm.on('volumechange', (volume) => console.log(volume));
+bgm.on('error', (error) => console.error(error));
 ```
-
-#### off(event: EventType, listener: EventListener): void
-移除事件监听器。
-
-**可用事件：**
-- `play` - 开始播放
-- `pause` - 暂停播放
-- `stop` - 停止播放
-- `ended` - 自然播放结束
-- `timeupdate` - 时间更新（提供 `{currentTime, duration}`）
-- `volumechange` - 音量改变
-- `error` - 发生错误
-- `loaded` - 资源加载完成
 
 ---
 
-## SFX
+## SFX 类
 
 音效管理器，支持重叠播放。
 
@@ -164,147 +104,99 @@ bgm.on('ended', () => console.log('BGM 播放结束'));
 new SFX(options?: SFXOptions)
 ```
 
-**配置选项：**
-- `volume?: number` - 初始音量 (0-1)，默认：1
-- `rate?: number` - 播放速率，默认：1
+#### SFXOptions
+
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `volume` | `number` | `1` | 默认音量 (0-1) |
+| `rate` | `number` | `1` | 默认播放速率 |
+| `stopOnHidden` | `boolean` | `false` | 页面隐藏时停止所有音效 |
+| `preload` | `boolean` | `false` | 预加载音频文件 |
 
 ### 方法
 
-#### load(src: string): Promise\<void\>
-预加载音效资源。
+#### `load(id: string, src: string): Promise<void>`
+使用给定 ID 加载音效。
 
 ```javascript
-await sfx.load('sounds/click.mp3');
+await sfx.load('click', 'sounds/click.wav');
 ```
 
-#### play(): Promise\<void\>
-播放音效。每次创建新实例，允许重叠播放。
+#### `play(id: string, options?: SFXOptions & { src?: string }): Promise<void>`
+播放音效。每次调用创建新实例，允许重叠播放。
 
 ```javascript
-await sfx.play();
-await sfx.play(); // 可以同时播放
+await sfx.play('click');
+await sfx.play('click', { volume: 0.5 }); // 自定义音量
+await sfx.play('newSound', { src: 'sounds/new.wav' }); // 直接指定源文件
 ```
 
-#### stopAll(): void
-停止所有正在播放的音效实例。
+#### `stop(id: string): void`
+停止特定音效的所有实例。
 
-```javascript
-sfx.stopAll();
-```
+#### `stopAll(): void`
+停止所有活跃的音效实例。
 
-#### destroy(): void
-清理所有资源并移除事件监听器。
-
-```javascript
-sfx.destroy();
-```
+#### `destroy(): void`
+清理所有资源。
 
 ### 属性
 
-#### volume: number
-获取或设置音量 (0-1)。影响所有活动实例和未来实例。
-
-```javascript
-sfx.volume = 0.8;
-```
-
-#### rate: number
-获取或设置播放速率。影响所有活动实例和未来实例。
-
-```javascript
-sfx.rate = 1.2;
-```
-
-#### activeCount: number (只读)
-获取当前正在播放的实例数量。
-
-```javascript
-console.log(sfx.activeCount); // 3
-```
-
-#### loaded: boolean (只读)
-检查音效是否已加载。
-
-```javascript
-if (sfx.loaded) {
-  await sfx.play();
-}
-```
-
-### 事件
-
-与 BGM 相同的事件系统：
-- `play` - 实例开始播放
-- `ended` - 实例播放结束
-- `stop` - 所有实例停止
-- `volumechange` - 音量改变
-- `error` - 发生错误
-- `loaded` - 资源加载完成
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `activeCount` | `number` | 当前播放的实例数量 |
 
 ---
 
-## Music
+## Music 类
 
-表示单个音乐曲目，支持元数据和歌词。
+表示单个音乐曲目，包含元数据和歌词。
 
 ### 构造函数
 
 ```typescript
-new Music(src: string, metadata?: Metadata)
+new Music(src: string, metadata?: Metadata, lrcUrl?: string | null)
 ```
 
-```javascript
-const music = new Music('songs/song.mp3', {
-  title: '歌曲标题',
-  artist: '艺术家',
-  album: '专辑名称',
-  cover: 'covers/cover.jpg',
-  lrc: '[00:00.00]歌词第一行\n[00:05.00]歌词第二行'
-});
-```
+#### Metadata
 
-### 属性
-
-#### url: string (只读)
-获取音频源 URL。
-
-```javascript
-console.log(music.url);
-```
-
-#### meta: Metadata
-获取或设置元数据。设置新元数据会与现有数据合并。
-
-```javascript
-music.meta = { artist: '新艺术家' };
-console.log(music.meta);
-```
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `title` | `string` | 曲目标题 |
+| `artist` | `string` | 艺术家名称 |
+| `album` | `string` | 专辑名称 |
+| `cover` | `string` | 封面图片 URL |
+| `lrc` | `string` | LRC 歌词文本 |
+| `duration` | `number` | 曲目时长 (秒) |
 
 ### 方法
 
-#### getLyrics(): Lyric[]
-获取所有解析后的歌词。
+#### `loadLyrics(): Promise<void>`
+从 LRC URL 加载歌词（懒加载）。
 
-```javascript
-const lyrics = music.getLyrics();
-// [{ time: 0, text: '歌词第一行' }, ...]
-```
+#### `getLyrics(): Lyric[]`
+获取解析后的歌词数组。
 
-#### getLyricAt(time: number): Lyric | null
-获取指定时间的歌词。
+#### `getLyricAt(time: number): Lyric | null`
+获取指定时间位置的歌词。
 
-```javascript
-const lyric = music.getLyricAt(5.5);
-console.log(lyric?.text);
-```
+### 属性
 
-### 事件
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `url` | `string` | 音频文件 URL |
+| `meta` | `Metadata` | 曲目元数据 |
+| `hasLyrics` | `boolean` | 是否有歌词 |
+| `lyricsReady` | `boolean` | 歌词是否已加载 |
 
-- `lyricsloaded` - 歌词解析成功
+### 静态方法
+
+#### `Music.parseLyrics(text: string): Lyric[]`
+解析 LRC 格式歌词文本。
 
 ---
 
-## MusicPlayer
+## MusicPlayer 类
 
 功能完整的音乐播放器，支持播放列表管理。
 
@@ -314,251 +206,108 @@ console.log(lyric?.text);
 new MusicPlayer(options?: MusicPlayerOptions)
 ```
 
-**配置选项：**
-- `volume?: number` - 初始音量 (0-1)，默认：1
-- `rate?: number` - 播放速率，默认：1
-- `loop?: boolean` - 循环当前曲目，默认：false
-- `mode?: PlayMode` - 播放模式，默认：PlayMode.SEQUENTIAL
+#### MusicPlayerOptions
+
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `volume` | `number` | `1` | 默认音量 (0-1) |
+| `rate` | `number` | `1` | 播放速率 |
+| `loop` | `boolean` | `false` | 启用曲目循环 |
+| `mode` | `PlayMode` | `SEQUENTIAL` | 播放模式 |
+| `fade` | `boolean` | `false` | 启用默认淡入淡出 (1000ms) |
+| `fadeIn` | `number` | `0` | 淡入时长 (毫秒) |
+| `fadeOut` | `number` | `0` | 淡出时长 (毫秒) |
+| `stopOnHidden` | `boolean` | `false` | 页面隐藏时自动暂停 |
+| `preload` | `boolean` | `true` | 预加载下一首 |
 
 ### 播放列表管理
 
-#### add(music: Music): void
-添加音乐到播放列表。
+#### `add(music: Music): void`
+添加音乐曲目到播放列表。
 
-```javascript
-const music = new Music('song.mp3', { title: '歌曲' });
-player.add(music);
-```
+#### `addList(musicList: Music[]): void`
+添加多个曲目到播放列表。
 
-#### addList(musicList: Music[]): void
-批量添加多个曲目。
+#### `addFromMeting(data: MetingData[]): Promise<void>`
+从 Meting API 响应添加曲目。
 
-```javascript
-player.addList([music1, music2, music3]);
-```
-
-#### addFromMeting(data: MetingData[]): Promise\<void\>
-从 Meting API 格式数据添加曲目。
-
-```javascript
-await player.addFromMeting(metingApiResponse);
-```
-
-#### remove(idx: number): void
+#### `remove(idx: number): void`
 移除指定索引的曲目。
 
-```javascript
-player.remove(0);
-```
-
-#### clear(): void
+#### `clear(): void`
 清空整个播放列表。
-
-```javascript
-player.clear();
-```
-
-#### get(idx: number): Music | null
-获取指定索引的曲目。
-
-```javascript
-const music = player.get(0);
-```
-
-#### getAll(): Music[]
-获取播放列表中的所有曲目。
-
-```javascript
-const allMusic = player.getAll();
-```
 
 ### 播放控制
 
-#### play(idx?: number): Promise\<void\>
-播放音乐。如果提供索引，播放该曲目。
+#### `play(idx?: number): Promise<void>`
+开始播放。如果提供索引，播放该曲目。
 
-```javascript
-await player.play(); // 播放当前曲目
-await player.play(2); // 播放索引为 2 的曲目
-```
-
-#### pause(): void
+#### `pause(): void`
 暂停播放。
 
-```javascript
-player.pause();
-```
-
-#### stop(): void
+#### `stop(): void`
 停止播放并重置位置。
 
-```javascript
-player.stop();
-```
-
-#### playNext(): Promise\<void\>
+#### `playNext(): Promise<void>`
 根据播放模式播放下一首。
 
-```javascript
-await player.playNext();
-```
-
-#### playPrev(): Promise\<void\>
+#### `playPrev(): Promise<void>`
 根据播放模式播放上一首。
-
-```javascript
-await player.playPrev();
-```
-
-#### next(): Music | null
-获取下一首曲目但不播放。
-
-```javascript
-const nextMusic = player.next();
-```
-
-#### prev(): Music | null
-获取上一首曲目但不播放。
-
-```javascript
-const prevMusic = player.prev();
-```
 
 ### 属性
 
-#### volume: number
-获取或设置音量 (0-1)。
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `volume` | `number` | 当前音量 (0-1) |
+| `rate` | `number` | 当前播放速率 |
+| `loop` | `boolean` | 曲目循环启用 |
+| `currentTime` | `number` | 当前位置 (秒) |
+| `duration` | `number` | 当前曲目时长 |
+| `paused` | `boolean` | 是否暂停 |
+| `state` | `PlayState` | 当前播放器状态 |
+| `progress` | `number` | 播放进度 (0-1) |
+| `current` | `Music \| null` | 当前加载的曲目 |
+| `length` | `number` | 播放列表长度 |
+| `currentIndex` | `number` | 当前曲目索引 |
+| `playMode` | `PlayMode` | 当前播放模式 |
+| `lyric` | `Lyric \| null` | 当前歌词行 |
 
-```javascript
-player.volume = 0.7;
-```
+### 播放列表访问
 
-#### currentTime: number
-获取或设置当前播放位置（秒）。
+#### `get(idx: number): Music | null`
+获取指定索引的曲目。
 
-```javascript
-player.currentTime = 60;
-```
+#### `getAll(): Music[]`
+获取整个播放列表的副本。
 
-#### duration: number (只读)
-获取当前曲目时长。
-
-```javascript
-console.log(player.duration);
-```
-
-#### progress: number
-获取或设置播放进度 (0-1)。
-
-```javascript
-player.progress = 0.5; // 跳转到 50%
-```
-
-#### paused: boolean (只读)
-检查播放器是否暂停。
-
-```javascript
-if (player.paused) {
-  await player.play();
-}
-```
-
-#### loop: boolean
-获取或设置当前曲目的循环模式。
-
-```javascript
-player.loop = true;
-```
-
-#### rate: number
-获取或设置播放速率。
-
-```javascript
-player.rate = 1.25;
-```
-
-#### state: PlayState (只读)
-获取当前播放器状态。
-
-```javascript
-console.log(player.state); // 'playing', 'paused', 'stopped', 'loading', 'error'
-```
-
-#### current: Music | null (只读)
-获取当前播放的音乐。
-
-```javascript
-const current = player.current;
-console.log(current?.meta.title);
-```
-
-#### currentIndex: number
-获取或设置当前曲目索引。
-
-```javascript
-player.currentIndex = 3;
-```
-
-#### length: number (只读)
-获取播放列表长度。
-
-```javascript
-console.log(player.length);
-```
-
-#### playMode: PlayMode
-获取或设置播放模式。
-
-```javascript
-player.playMode = PlayMode.SHUFFLE;
-```
-
-#### lyric: Lyric | null (只读)
-获取当前歌词行。
-
-```javascript
-const lyric = player.lyric;
-console.log(lyric?.text);
-```
-
-### 方法
-
-#### getLyrics(): Lyric[]
-获取当前曲目的所有歌词。
-
-```javascript
-const lyrics = player.getLyrics();
-```
-
-#### destroy(): void
-清理所有资源。
-
-```javascript
-player.destroy();
-```
+#### `getLyrics(): Lyric[]`
+获取当前曲目的歌词。
 
 ### 事件
 
-- `play` - 开始播放
-- `pause` - 暂停播放
-- `stop` - 停止播放
-- `ended` - 曲目播放结束
-- `timeupdate` - 时间更新（提供 `{currentTime, duration}`）
-- `volumechange` - 音量改变
-- `error` - 发生错误
-- `musicchange` - 当前曲目改变（提供 Music 对象）
-- `playlistchange` - 播放列表修改
-- `lyricchange` - 当前歌词行改变（提供 Lyric 对象）
+```javascript
+player.on('play', () => console.log('播放中'));
+player.on('pause', () => console.log('已暂停'));
+player.on('stop', () => console.log('已停止'));
+player.on('ended', () => console.log('曲目结束'));
+player.on('musicchange', (music) => console.log('曲目切换:', music));
+player.on('timeupdate', (data) => console.log(data.currentTime, data.duration));
+player.on('lyricchange', (lyric) => console.log('歌词:', lyric?.text));
+player.on('lyricsloaded', () => console.log('歌词已加载'));
+player.on('playlistchange', () => console.log('播放列表更新'));
+player.on('volumechange', (volume) => console.log('音量:', volume));
+player.on('error', (error) => console.error(error));
+```
 
 ---
 
-## 类型定义
+## 类型和枚举
 
 ### PlayMode
 
 ```typescript
 enum PlayMode {
-  LOOP = 'loop',           // 循环播放整个列表
+  LOOP = 'loop',           // 循环播放列表
   SHUFFLE = 'shuffle',     // 随机顺序
   SINGLE = 'single',       // 单曲循环
   SEQUENTIAL = 'sequential' // 顺序播放一次
@@ -577,25 +326,22 @@ enum PlayState {
 }
 ```
 
-### Metadata
-
-```typescript
-interface Metadata {
-  title?: string;      // 标题
-  artist?: string;     // 艺术家
-  album?: string;      // 专辑
-  cover?: string;      // 封面图片 URL
-  lrc?: string;        // LRC 格式歌词
-  duration?: number;   // 时长（秒）
-}
-```
-
 ### Lyric
 
 ```typescript
 interface Lyric {
-  time: number;  // 时间（秒）
+  time: number;  // 时间戳 (秒)
   text: string;  // 歌词文本
+}
+```
+
+### SFXInstance
+
+```typescript
+interface SFXInstance {
+  audio: HTMLAudioElement;
+  id: string;
+  stop(): void;
 }
 ```
 
@@ -616,3 +362,83 @@ interface MetingData {
   lyric?: string;
 }
 ```
+
+### EventType
+
+```typescript
+type EventType = 
+  | 'play'           // 播放
+  | 'pause'          // 暂停
+  | 'stop'           // 停止
+  | 'ended'          // 结束
+  | 'timeupdate'     // 时间更新
+  | 'volumechange'   // 音量变化
+  | 'error'          // 错误
+  | 'loaded'         // 已加载
+  | 'lyricchange'    // 歌词变化
+  | 'lyricsloaded'   // 歌词加载完成
+  | 'musicchange'    // 音乐变化
+  | 'playlistchange'; // 播放列表变化
+```
+
+---
+
+## 事件
+
+所有类都支持使用 `on()` 和 `off()` 方法进行事件监听：
+
+```typescript
+// 添加事件监听器
+instance.on(event: EventType, listener: EventListener): void
+
+// 移除事件监听器
+instance.off(event: EventType, listener: EventListener): void
+
+// 事件监听器函数
+type EventListener = (data?: any) => void
+```
+
+### 通用事件
+
+- **`play`** - 播放开始
+- **`pause`** - 播放暂停
+- **`stop`** - 播放停止
+- **`ended`** - 曲目/音频结束
+- **`timeupdate`** - 播放位置更新
+- **`volumechange`** - 音量改变
+- **`error`** - 发生错误
+
+### MusicPlayer 特有事件
+
+- **`musicchange`** - 当前曲目改变
+- **`lyricchange`** - 当前歌词行改变
+- **`lyricsloaded`** - 歌词加载完成
+- **`playlistchange`** - 播放列表修改
+
+---
+
+## 错误处理
+
+所有异步方法都可能抛出错误。始终使用 try-catch：
+
+```javascript
+try {
+  await player.play();
+} catch (error) {
+  console.error('播放失败:', error);
+}
+
+// 或通过事件处理
+player.on('error', (error) => {
+  console.error('播放器错误:', error);
+});
+```
+
+## 最佳实践
+
+1. **始终处理错误** - 使用 try-catch 或错误事件
+2. **清理资源** - 完成后调用 `destroy()`
+3. **明智预加载** - 启用预加载以获得更好的用户体验，但考虑带宽
+4. **处理页面可见性** - 使用 `stopOnHidden` 获得更好的移动端体验
+5. **淡入淡出效果** - 使用淡入淡出实现平滑过渡
+6. **事件监听器** - 组件卸载时移除监听器
