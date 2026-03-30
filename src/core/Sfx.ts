@@ -180,6 +180,53 @@ export class SFX {
   }
 
   /**
+   * 直接播放一个音频文件（无需预加载或缓存）
+   * 适用于一次性播放的音效
+   */
+  async once(src: string, options: SFXOptions = {}): Promise<void> {
+    if (!this.Config.enable) {
+      return;
+    }
+    if (this.blocked) return;
+
+    const mergedOptions: SFXOptions = { ...this.Config, ...options };
+    const audio = new Audio(src);
+
+    if (mergedOptions.volume !== undefined) {
+      audio.volume = Math.max(0, Math.min(1, mergedOptions.volume));
+    }
+    if (mergedOptions.rate !== undefined) {
+      audio.playbackRate = mergedOptions.rate;
+    }
+
+    const instance: SFXInstance = {
+      audio,
+      id: src, // 使用 src 作为临时 id
+      stop() {
+        audio.pause();
+        audio.currentTime = 0;
+      },
+    };
+
+    this.ActiveInstances.add(instance);
+
+    audio.addEventListener("ended", () => {
+      this.ActiveInstances.delete(instance);
+    }, { once: true });
+
+    audio.addEventListener("error", () => {
+      this.ActiveInstances.delete(instance);
+    }, { once: true });
+
+    try {
+      await audio.play();
+    } catch (error) {
+      this.ActiveInstances.delete(instance);
+      throw error;
+    }
+  }
+
+  /**
    * 停止所有正在播放的音效实例
    */
   stopAll(): void {

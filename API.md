@@ -170,6 +170,14 @@ await sfx.play('click', { volume: 0.5 }); // Custom volume
 await sfx.play('newSound', { src: 'sounds/new.wav' }); // Direct src
 ```
 
+#### `once(src: string, options?: SFXOptions): Promise<void>`
+Directly play an audio file without preloading or caching. Ideal for one-time sound effects.
+
+```javascript
+await sfx.once('sounds/notification.wav');
+await sfx.once('sounds/alert.mp3', { volume: 0.7, rate: 1.2 }); // Custom options
+```
+
 #### `stop(id: string): void`
 Stop all instances of a specific sound effect.
 

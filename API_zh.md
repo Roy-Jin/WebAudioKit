@@ -170,6 +170,14 @@ await sfx.play('click', { volume: 0.5 }); // 自定义音量
 await sfx.play('newSound', { src: 'sounds/new.wav' }); // 直接指定源文件
 ```
 
+#### `once(src: string, options?: SFXOptions): Promise<void>`
+直接播放一个音频文件，无需预加载或缓存。适用于一次性播放的音效。
+
+```javascript
+await sfx.once('sounds/notification.wav');
+await sfx.once('sounds/alert.mp3', { volume: 0.7, rate: 1.2 }); // 自定义选项
+```
+
 #### `stop(id: string): void`
 停止特定音效的所有实例。
 
