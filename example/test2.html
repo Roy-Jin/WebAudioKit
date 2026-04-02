@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -21,7 +21,7 @@
 
     h1 { font-size: 1.3rem; font-weight: 600; color: #fff; letter-spacing: 0.05em; }
 
-    /* 加载遮罩 */
+    /* Loading overlay */
     .loading-overlay {
       position: fixed; inset: 0;
       background: #0f0f13;
@@ -36,14 +36,14 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* 播放器主卡片 */
+    /* Player Card */
     .player-card {
       width: 100%; max-width: 560px;
       background: #1a1a22; border: 1px solid #2a2a36;
       border-radius: 16px; overflow: hidden;
     }
 
-    /* 封面区 */
+    /* Cover area */
     .cover-wrap {
       position: relative;
       width: 100%; aspect-ratio: 1;
@@ -56,7 +56,7 @@
     }
     .cover-wrap img.hidden { opacity: 0; }
 
-    /* 状态徽章 */
+    /* Status badge */
     .state-badge {
       position: absolute; top: 12px; right: 12px;
       background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
@@ -75,7 +75,7 @@
     .dot.error    { background: #ef4444; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-    /* 信息区 */
+    /* Info area */
     .info-wrap {
       padding: 20px 24px 0;
       display: flex; flex-direction: column; gap: 4px;
@@ -89,7 +89,7 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* 歌词 */
+    /* Lyrics */
     .lyric-line {
       min-height: 22px; padding: 8px 24px 0;
       font-size: 0.82rem; color: #6366f1;
@@ -98,7 +98,7 @@
       transition: opacity 0.3s;
     }
 
-    /* 进度条 */
+    /* Progress bar */
     .progress-wrap {
       padding: 12px 24px 0;
       display: flex; align-items: center; gap: 10px;
@@ -114,7 +114,7 @@
       transition: width 0.25s linear;
     }
 
-    /* 音量 */
+    /* Volume */
     .volume-row {
       padding: 10px 24px 0;
       display: flex; align-items: center; gap: 10px;
@@ -123,7 +123,7 @@
     input[type=range] { flex: 1; accent-color: #6366f1; cursor: pointer; }
     .vol-label { min-width: 36px; text-align: right; color: #aaa; }
 
-    /* 控制按钮 */
+    /* Control buttons */
     .controls {
       padding: 16px 24px 20px;
       display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -141,7 +141,7 @@
     .btn.primary { background: #6366f1; color: #fff; border-color: #6366f1; }
     .btn.primary:hover { background: #4f52d4; }
 
-    /* 播放模式 */
+    /* Play mode */
     .mode-row {
       padding: 0 24px 16px;
       display: flex; gap: 8px; flex-wrap: wrap;
@@ -154,7 +154,7 @@
     }
     .mode-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
 
-    /* 播放列表 */
+    /* Playlist */
     .playlist-card {
       width: 100%; max-width: 560px;
       background: #1a1a22; border: 1px solid #2a2a36;
@@ -201,18 +201,18 @@
 
   <div class="loading-overlay" id="loading">
     <div class="spinner"></div>
-    <span id="loading-text">正在获取播放列表...</span>
+    <span id="loading-text">Loading playlist...</span>
   </div>
 
   <h1>MusicPlayer Test</h1>
 
-  <!-- 播放器主卡片 -->
+  <!-- Player Card -->
   <div class="player-card">
     <div class="cover-wrap">
       <img id="cover" src="" alt="cover" class="hidden" />
       <div class="state-badge">
         <div class="dot stopped" id="state-dot"></div>
-        <span id="state-text">未播放</span>
+        <span id="state-text">Not Playing</span>
       </div>
     </div>
 
@@ -237,32 +237,32 @@
     </div>
 
     <div class="controls">
-      <button class="btn icon" id="btn-prev" title="上一首">⏮</button>
-      <button class="btn icon primary" id="btn-play" title="播放/暂停">▶</button>
-      <button class="btn icon" id="btn-next" title="下一首">⏭</button>
-      <button class="btn icon" id="btn-stop" title="停止">⏹</button>
+      <button class="btn icon" id="btn-prev" title="Previous">⏮</button>
+      <button class="btn icon primary" id="btn-play" title="Play/Pause">▶</button>
+      <button class="btn icon" id="btn-next" title="Next">⏭</button>
+      <button class="btn icon" id="btn-stop" title="Stop">⏹</button>
     </div>
 
     <div class="mode-row">
-      <button class="mode-btn" data-mode="sequential">顺序</button>
-      <button class="mode-btn" data-mode="loop">列表循环</button>
-      <button class="mode-btn" data-mode="single">单曲循环</button>
-      <button class="mode-btn active" data-mode="shuffle">随机</button>
+      <button class="mode-btn" data-mode="sequential">Sequential</button>
+      <button class="mode-btn" data-mode="loop">Loop Playlist</button>
+      <button class="mode-btn" data-mode="single">Single Loop</button>
+      <button class="mode-btn active" data-mode="shuffle">Shuffle</button>
     </div>
   </div>
 
-  <!-- 播放列表 -->
+  <!-- Playlist -->
   <div class="playlist-card">
-    <div class="playlist-header">播放列表 · <span id="playlist-count">0</span> 首</div>
+    <div class="playlist-header">Playlist · <span id="playlist-count">0</span> tracks</div>
     <div class="playlist-body" id="playlist-body"></div>
   </div>
 
   <script type="module">
-    import { MusicPlayer, PlayMode } from '../dist/index.js';
+    import { MusicPlayer, PlayMode } from 'https://unpkg.com/webaudiokit/dist/index.js';
 
     const METING_API = 'https://api.i-meto.com/meting/api';
 
-    // ── 工具 ──────────────────────────────────────────────
+    // ── Utilities ──────────────────────────────────────
     const $ = id => document.getElementById(id);
     const fmt = s => {
       if (!s || isNaN(s) || !isFinite(s)) return '0:00';
@@ -270,7 +270,7 @@
       return `${m}:${sec.toString().padStart(2, '0')}`;
     };
 
-    // ── 初始化播放器 ──────────────────────────────────────
+    // ── Initialize Player ──────────────────────────────
     const player = new MusicPlayer({
       volume: 0.8,
       fade: true,
@@ -279,21 +279,21 @@
     });
     window.player = player;
 
-    // ── 获取播放列表 ──────────────────────────────────────
-    $('loading-text').textContent = '正在获取播放列表...';
+    // ── Load Playlist ──────────────────────────────────
+    $('loading-text').textContent = 'Loading playlist...';
     let metingData;
     try {
       const res = await fetch(`${METING_API}?server=netease&type=playlist&id=14110835110`);
       metingData = await res.json();
     } catch (e) {
-      $('loading-text').textContent = '获取失败，请检查网络';
+      $('loading-text').textContent = 'Failed to load, check network';
       throw e;
     }
 
     player.addFromMeting(metingData);
     $('loading').style.display = 'none';
 
-    // ── 渲染播放列表 ──────────────────────────────────────
+    // ── Render Playlist ────────────────────────────────
     function renderPlaylist() {
       const all = player.getAll();
       $('playlist-count').textContent = all.length;
@@ -307,8 +307,8 @@
         item.innerHTML = `
           <div class="item-index">${i + 1}</div>
           <div class="item-info">
-            <div class="item-title">${meta.title ?? '未知曲目'}</div>
-            <div class="item-artist">${meta.artist ?? '未知艺术家'}</div>
+            <div class="item-title">${meta.title ?? 'Unknown Track'}</div>
+            <div class="item-artist">${meta.artist ?? 'Unknown Artist'}</div>
           </div>
           <div class="item-dur">${fmt(meta.duration)}</div>
         `;
@@ -321,19 +321,19 @@
       document.querySelectorAll('.playlist-item').forEach((el, i) => {
         el.classList.toggle('active', i === player.currentIndex);
       });
-      // 滚动到当前项
+      // Scroll to current item
       const active = $('playlist-body').querySelector('.playlist-item.active');
       active?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
     renderPlaylist();
 
-    // ── 状态更新 ──────────────────────────────────────────
+    // ── State Updates ──────────────────────────────────
     const syncPlayBtn = () => { $('btn-play').textContent = player.paused ? '▶' : '⏸'; };
 
     function setStateDot(state) {
       $('state-dot').className = `dot ${state}`;
-      const labels = { playing: '播放中', paused: '已暂停', stopped: '未播放', loading: '加载中', error: '错误' };
+      const labels = { playing: 'Playing', paused: 'Paused', stopped: 'Not Playing', loading: 'Loading', error: 'Error' };
       $('state-text').textContent = labels[state] ?? state;
       syncPlayBtn();
     }
@@ -341,8 +341,8 @@
     function updateMeta(music) {
       if (!music) return;
       const meta = music.meta;
-      const title  = meta.title  ?? '未知曲目';
-      const artist = meta.artist ?? '未知艺术家';
+      const title  = meta.title  ?? 'Unknown Track';
+      const artist = meta.artist ?? 'Unknown Artist';
       $('track-title').textContent  = title;
       $('track-artist').textContent = artist;
       document.title = `${title} - ${artist}`;
@@ -355,7 +355,7 @@
       }
     }
 
-    // ── 事件监听 ──────────────────────────────────────────
+    // ── Event Listeners ────────────────────────────────
     player.on('play',    () => setStateDot('playing'));
     player.on('pause',   () => setStateDot('paused'));
     player.on('stop',    () => { setStateDot('stopped'); $('lyric-line').textContent = ''; document.title = 'MusicPlayer Test'; });
@@ -390,7 +390,7 @@
       // console.error('Player error:', e);
     });
 
-    // ── 控制按钮 ──────────────────────────────────────────
+    // ── Control Buttons ────────────────────────────────
     $('btn-play').addEventListener('click', () => {
       if (player.paused) player.play();
       else player.pause();
@@ -400,20 +400,20 @@
     $('btn-next').addEventListener('click', () => player.playNext());
     $('btn-stop').addEventListener('click', () => player.stop());
 
-    // ── 进度条点击 ────────────────────────────────────────
+    // ── Progress bar click ─────────────────────────────
     $('progress-track').addEventListener('click', e => {
       if (!player.duration) return;
       const rect = e.currentTarget.getBoundingClientRect();
       player.currentTime = ((e.clientX - rect.left) / rect.width) * player.duration;
     });
 
-    // ── 音量滑块 ──────────────────────────────────────────
+    // ── Volume slider ──────────────────────────────────
     $('vol-slider').addEventListener('input', e => {
       player.volume = e.target.value / 100;
       $('vol-label').textContent = `${e.target.value}%`;
     });
 
-    // ── 播放模式 ──────────────────────────────────────────
+    // ── Play mode ─────────────────────────────────────
     document.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -46,7 +46,6 @@
       color: #888;
     }
 
-    /* 状态指示器 */
     .status-bar {
       display: flex;
       align-items: center;
@@ -73,7 +72,6 @@
 
     .status-text { flex: 1; color: #ccc; }
 
-    /* 进度条 */
     .progress-wrap {
       display: flex;
       align-items: center;
@@ -100,7 +98,6 @@
       pointer-events: none;
     }
 
-    /* 音量滑块 */
     .volume-row {
       display: flex;
       align-items: center;
@@ -117,7 +114,6 @@
 
     .vol-label { min-width: 36px; text-align: right; color: #ccc; }
 
-    /* 按钮组 */
     .btn-row {
       display: flex;
       flex-wrap: wrap;
@@ -140,7 +136,6 @@
     button.danger { border-color: #ef4444; color: #ef4444; }
     button.danger:hover { background: #ef4444; color: #fff; }
 
-    /* SFX 活跃计数徽章 */
     .badge {
       display: inline-block;
       background: #6366f1;
@@ -154,7 +149,6 @@
       text-align: center;
     }
 
-    /* 加载状态 */
     .loading-overlay {
       position: fixed;
       inset: 0;
@@ -183,18 +177,17 @@
 
   <div class="loading-overlay" id="loading">
     <div class="spinner"></div>
-    <span id="loading-text">正在加载音频资源...</span>
+    <span id="loading-text">Loading audio resources...</span>
   </div>
 
   <h1>WebAudioKit Test</h1>
 
-  <!-- BGM -->
   <div class="card">
-    <div class="card-title">BGM · 背景音乐</div>
+    <div class="card-title">BGM · Background Music</div>
 
     <div class="status-bar">
       <div class="dot stopped" id="bgm-dot"></div>
-      <span class="status-text" id="bgm-status">未播放</span>
+      <span class="status-text" id="bgm-status">Not Playing</span>
       <span id="bgm-track" style="color:#666;font-size:0.78rem;">—</span>
     </div>
 
@@ -207,7 +200,7 @@
     </div>
 
     <div class="volume-row">
-      <span>音量</span>
+      <span>Volume</span>
       <input type="range" min="0" max="100" value="60" id="bgm-vol-slider" />
       <span class="vol-label" id="bgm-vol-label">60%</span>
     </div>
@@ -215,41 +208,39 @@
     <div class="btn-row">
       <button id="btn-bgm1">▶ BGM 1</button>
       <button id="btn-bgm2">▶ BGM 2</button>
-      <button id="btn-bgm-pause">⏸ 暂停</button>
-      <button id="btn-bgm-resume">▶ 恢复</button>
-      <button id="btn-bgm-stop" class="danger">⏹ 停止</button>
+      <button id="btn-bgm-pause">⏸ Pause</button>
+      <button id="btn-bgm-resume">▶ Resume</button>
+      <button id="btn-bgm-stop" class="danger">⏹ Stop</button>
     </div>
   </div>
 
-  <!-- SFX -->
   <div class="card">
-    <div class="card-title">SFX · 音效</div>
+    <div class="card-title">SFX · Sound Effects</div>
 
     <div class="status-bar">
       <div class="dot stopped" id="sfx-dot"></div>
-      <span class="status-text" id="sfx-status">待机</span>
-      <span id="sfx-badge-wrap" style="font-size:0.78rem;color:#666;">活跃实例 <span class="badge" id="sfx-count">0</span></span>
+      <span class="status-text" id="sfx-status">Standby</span>
+      <span id="sfx-badge-wrap" style="font-size:0.78rem;color:#666;">Active Instances <span class="badge" id="sfx-count">0</span></span>
     </div>
 
     <div class="volume-row">
-      <span>音量</span>
+      <span>Volume</span>
       <input type="range" min="0" max="100" value="70" id="sfx-vol-slider" />
       <span class="vol-label" id="sfx-vol-label">70%</span>
     </div>
 
     <div class="btn-row">
-      <button id="btn-sfx1">🔊 音效 1</button>
-      <button id="btn-sfx2">🔊 音效 2</button>
-      <button id="btn-sfx3">🔊 音效 3</button>
-      <button id="btn-sfx-rapid">⚡ 连发×5</button>
-      <button id="btn-sfx-stop" class="danger">⏹ 全部停止</button>
+      <button id="btn-sfx1">🔊 SFX 1</button>
+      <button id="btn-sfx2">🔊 SFX 2</button>
+      <button id="btn-sfx3">🔊 SFX 3</button>
+      <button id="btn-sfx-rapid">⚡ Rapid Fire×5</button>
+      <button id="btn-sfx-stop" class="danger">⏹ Stop All</button>
     </div>
   </div>
 
   <script type="module">
-    import { BGM, SFX } from '../dist/index.js';
+    import { BGM, SFX } from 'https://unpkg.com/webaudiokit/dist/index.js';
 
-    // ── 工具函数 ──────────────────────────────────────────
     const $ = id => document.getElementById(id);
     const fmt = s => {
       if (!s || isNaN(s)) return '0:00';
@@ -257,14 +248,11 @@
       return `${m}:${sec.toString().padStart(2, '0')}`;
     };
 
-    // ── BGM 初始化 ────────────────────────────────────────
     window.bgm = new BGM({ volume: 0.6, loop: true, fadeIn: 800, fadeOut: 600, stopOnHidden: true });
 
-    // ── SFX 初始化 ────────────────────────────────────────
     window.sfx = new SFX({ volume: 0.7, stopOnHidden: true });
 
-    // ── 加载资源 ──────────────────────────────────────────
-    $('loading-text').textContent = '正在加载音频资源...';
+    $('loading-text').textContent = 'Loading audio resources...';
     await Promise.all([
       bgm.load('bgm1', 'assets/bgm_1.mp3'),
       bgm.load('bgm2', 'assets/bgm_2.mp3'),
@@ -274,14 +262,13 @@
     ]);
     $('loading').style.display = 'none';
 
-    // ── BGM 状态更新 ──────────────────────────────────────
     let bgmState = 'stopped'; // playing | paused | stopped
 
     function setBgmState(state, trackName) {
       bgmState = state;
       const dot = $('bgm-dot');
       dot.className = `dot ${state}`;
-      const labels = { playing: '播放中', paused: '已暂停', stopped: '未播放' };
+      const labels = { playing: 'Playing', paused: 'Paused', stopped: 'Not Playing' };
       $('bgm-status').textContent = labels[state] ?? state;
       if (trackName !== undefined) $('bgm-track').textContent = trackName || '—';
     }
@@ -301,7 +288,6 @@
     bgm.on('stop',  () => { setBgmState('stopped', '—'); $('bgm-progress').style.width = '0%'; $('bgm-cur').textContent = '0:00'; });
     bgm.on('ended', () => setBgmState('stopped'));
 
-    // ── BGM 音量滑块 ──────────────────────────────────────
     $('bgm-vol-slider').addEventListener('input', e => {
       const v = e.target.value / 100;
       bgm.volume = v;
@@ -314,14 +300,12 @@
       $('bgm-vol-label').textContent = `${pct}%`;
     });
 
-    // ── BGM 进度条点击跳转 ────────────────────────────────
     $('bgm-progress-track').addEventListener('click', e => {
       if (!bgm.duration) return;
       const rect = e.currentTarget.getBoundingClientRect();
       bgm.currentTime = ((e.clientX - rect.left) / rect.width) * bgm.duration;
     });
 
-    // ── BGM 按钮 ──────────────────────────────────────────
     $('btn-bgm1').addEventListener('click', async () => {
       await bgm.play('bgm1');
       setBgmState('playing', 'BGM 1');
@@ -336,38 +320,36 @@
     $('btn-bgm-resume').addEventListener('click', () => bgm.resume());
     $('btn-bgm-stop').addEventListener('click', () => bgm.stop());
 
-    // ── SFX 活跃计数实时刷新 ──────────────────────────────
     function updateSfxCount() {
       const n = sfx.activeCount;
       $('sfx-count').textContent = n;
       const dot = $('sfx-dot');
       if (n > 0) {
         dot.className = 'dot active';
-        $('sfx-status').textContent = `${n} 个实例播放中`;
+        $('sfx-status').textContent = `${n} instances playing`;
       } else {
         dot.className = 'dot stopped';
-        $('sfx-status').textContent = '待机';
+        $('sfx-status').textContent = 'Standby';
       }
     }
 
     setInterval(updateSfxCount, 100);
 
-    // ── SFX 音量滑块 ──────────────────────────────────────
     let sfxVolume = 0.7;
     $('sfx-vol-slider').addEventListener('input', e => {
       sfxVolume = e.target.value / 100;
       $('sfx-vol-label').textContent = `${e.target.value}%`;
+      sfx.config.volume = sfxVolume;
     });
 
-    // ── SFX 按钮 ──────────────────────────────────────────
-    $('btn-sfx1').addEventListener('click', () => sfx.play('sfx1', { volume: sfxVolume }));
-    $('btn-sfx2').addEventListener('click', () => sfx.play('sfx2', { volume: sfxVolume }));
-    $('btn-sfx3').addEventListener('click', () => sfx.play('sfx3', { volume: sfxVolume }));
+    $('btn-sfx1').addEventListener('click', () => sfx.play('sfx1'));
+    $('btn-sfx2').addEventListener('click', () => sfx.play('sfx2'));
+    $('btn-sfx3').addEventListener('click', () => sfx.play('sfx3'));
 
     $('btn-sfx-rapid').addEventListener('click', () => {
       let i = 0;
       const t = setInterval(() => {
-        sfx.play('sfx1', { volume: sfxVolume });
+        sfx.play('sfx1');
         if (++i >= 5) clearInterval(t);
       }, 180);
     });
