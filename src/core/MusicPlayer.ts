@@ -501,6 +501,10 @@ export class MusicPlayer {
 
   // ==================== Getters & Setters ====================
 
+  get audioElement(): HTMLAudioElement | null {
+    return this.audio;
+  }
+
   get volume(): number {
     return this.audio?.volume ?? this.Config.volume!;
   }

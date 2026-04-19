@@ -229,13 +229,15 @@ new Music(src: string, metadata?: Metadata, lrcUrl?: string | null)
 | `artist` | `string` | 艺术家名称 |
 | `album` | `string` | 专辑名称 |
 | `cover` | `string` | 封面图片 URL |
-| `lrc` | `string` | LRC 歌词文本 |
+| `lrc` | `string` | LRC 歌词文本或歌词文件 URL |
 | `duration` | `number` | 曲目时长 (秒) |
 
 ### 方法
 
 #### `loadLyrics(): Promise<void>`
-从 LRC URL 加载歌词（懒加载）。
+从歌词 URL 加载歌词（懒加载）。支持以下来源：
+- 构造函数的 `lrcUrl` 参数
+- `metadata.lrc` 中的 URL 格式字符串
 
 #### `getLyrics(): Lyric[]`
 获取解析后的歌词数组。
@@ -265,6 +267,36 @@ music.meta = { title: 'New Title' };  // 也可以
 
 // LRC 自动解析
 music.meta.lrc = '[00:12.00]Hello world';  // 歌词自动解析
+
+// LRC URL 支持（懒加载）
+music.meta.lrc = 'https://example.com/lyrics.lrc';  // 检测为 URL，播放时自动 fetch
+```
+
+### 歌词加载方式
+
+Music 类支持多种歌词加载方式：
+
+```javascript
+// 方式1: 直接传入 LRC 文本（立即解析）
+const song1 = new Music('song1.mp3', {
+  title: '歌曲名',
+  lrc: '[00:12.00]第一行歌词\n[00:15.00]第二行歌词'
+});
+
+// 方式2: 通过 metadata.lrc 传入 URL（懒加载）
+const song2 = new Music('song2.mp3', {
+  title: '歌曲名',
+  lrc: 'https://example.com/lyrics.lrc'  // 自动检测为 URL
+});
+
+// 方式3: 通过 lrcUrl 参数传入（懒加载）
+const song3 = new Music('song3.mp3', {
+  title: '歌曲名'
+}, 'https://example.com/lyrics.lrc');
+
+// 方式4: 动态设置歌词
+song1.meta.lrc = '[00:00.00]新歌词';  // LRC 文本，立即解析
+song1.meta.lrc = 'https://example.com/new.lrc';  // URL，懒加载
 ```
 
 ### 静态方法
@@ -341,6 +373,7 @@ new MusicPlayer(options?: MusicPlayerOptions)
 
 | 属性 | 类型 | 描述 |
 |------|------|------|
+| `audioElement` | `HTMLAudioElement \| null` | 底层 audio 元素 (只读) |
 | `volume` | `number` | 当前音量 (0-1)，setter 立即应用 |
 | `rate` | `number` | 当前播放速率，setter 立即应用 |
 | `loop` | `boolean` | 曲目循环启用，setter 立即应用 |

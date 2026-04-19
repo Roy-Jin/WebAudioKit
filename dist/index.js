@@ -41,7 +41,7 @@ class SFX {
             rate: 1,
             stopOnHidden: false,
             preload: false,
-            enable: true
+            enable: true,
         };
         this.ActiveInstances = new Set();
         this.Cache = new Map(); // id -> src
@@ -73,19 +73,19 @@ class SFX {
                 // 处理配置变更
                 this.handleConfigChange(prop, value, oldValue);
                 return true;
-            }
+            },
         });
     }
     handleConfigChange(key, newValue, oldValue) {
         if (newValue === oldValue)
             return;
         switch (key) {
-            case 'enable':
+            case "enable":
                 if (newValue === false) {
                     this.stopAll();
                 }
                 break;
-            case 'stopOnHidden':
+            case "stopOnHidden":
                 this.setupVisibilityHandler();
                 break;
         }
@@ -93,7 +93,7 @@ class SFX {
     setupVisibilityHandler() {
         // 清理旧的监听器
         if (this.visibilityHandler) {
-            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            document.removeEventListener("visibilitychange", this.visibilityHandler);
             this.visibilityHandler = null;
         }
         // 如果启用 stopOnHidden，设置新的监听器
@@ -107,7 +107,7 @@ class SFX {
                     this.blocked = false;
                 }
             };
-            document.addEventListener('visibilitychange', this.visibilityHandler);
+            document.addEventListener("visibilitychange", this.visibilityHandler);
         }
     }
     /**
@@ -122,22 +122,18 @@ class SFX {
                 return;
             }
             return new Promise((resolve, reject) => {
-                const audio = new Audio(src);
+                let audio = new Audio(src);
+                this.Cache.set(id, src);
                 const onLoad = () => {
-                    this.Cache.set(id, src);
-                    cleanup();
+                    audio = null;
                     resolve();
                 };
                 const onError = (e) => {
-                    cleanup();
+                    audio = null;
                     reject(e);
                 };
-                const cleanup = () => {
-                    audio.removeEventListener('canplaythrough', onLoad);
-                    audio.removeEventListener('error', onError);
-                };
-                audio.addEventListener('canplaythrough', onLoad, { once: true });
-                audio.addEventListener('error', onError, { once: true });
+                audio.addEventListener("canplaythrough", onLoad, { once: true });
+                audio.addEventListener("error", onError, { once: true });
                 audio.load();
             });
         });
@@ -175,13 +171,56 @@ class SFX {
                 stop() {
                     audio.pause();
                     audio.currentTime = 0;
-                }
+                },
             };
             this.ActiveInstances.add(instance);
-            audio.addEventListener('ended', () => {
+            audio.addEventListener("ended", () => {
                 this.ActiveInstances.delete(instance);
             }, { once: true });
-            audio.addEventListener('error', () => {
+            audio.addEventListener("error", () => {
+                this.ActiveInstances.delete(instance);
+            }, { once: true });
+            try {
+                yield audio.play();
+            }
+            catch (error) {
+                this.ActiveInstances.delete(instance);
+                throw error;
+            }
+        });
+    }
+    /**
+     * 直接播放一个音频文件（无需预加载或缓存）
+     * 适用于一次性播放的音效
+     */
+    once(src_1) {
+        return __awaiter(this, arguments, void 0, function* (src, options = {}) {
+            if (!this.Config.enable) {
+                return;
+            }
+            if (this.blocked)
+                return;
+            const mergedOptions = Object.assign(Object.assign({}, this.Config), options);
+            const audio = new Audio(src);
+            if (mergedOptions.volume !== undefined) {
+                audio.volume = Math.max(0, Math.min(1, mergedOptions.volume));
+            }
+            if (mergedOptions.rate !== undefined) {
+                audio.playbackRate = mergedOptions.rate;
+            }
+            const instance = {
+                audio,
+                id: src, // 使用 src 作为临时 id
+                stop() {
+                    audio.pause();
+                    audio.currentTime = 0;
+                },
+            };
+            this.ActiveInstances.add(instance);
+            audio.addEventListener("ended", () => {
+                this.ActiveInstances.delete(instance);
+            }, { once: true });
+            audio.addEventListener("error", () => {
                 this.ActiveInstances.delete(instance);
             }, { once: true });
             try {
@@ -197,14 +236,14 @@ class SFX {
      * 停止所有正在播放的音效实例
      */
     stopAll() {
-        this.ActiveInstances.forEach(instance => instance.stop());
+        this.ActiveInstances.forEach((instance) => instance.stop());
         this.ActiveInstances.clear();
     }
     /**
      * 停止指定 id 的所有音效实例
      */
     stop(id) {
-        this.ActiveInstances.forEach(instance => {
+        this.ActiveInstances.forEach((instance) => {
             if (instance.id === id) {
                 instance.stop();
                 this.ActiveInstances.delete(instance);
@@ -221,7 +260,7 @@ class SFX {
         return this.configProxy;
     }
     set config(newConfig) {
-        Object.keys(newConfig).forEach(key => {
+        Object.keys(newConfig).forEach((key) => {
             const k = key;
             if (newConfig[k] !== undefined) {
                 this.configProxy[k] = newConfig[k];
@@ -233,7 +272,7 @@ class SFX {
         this.ActiveInstances.clear();
         this.Cache.clear();
         if (this.visibilityHandler) {
-            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            document.removeEventListener("visibilitychange", this.visibilityHandler);
             this.visibilityHandler = null;
         }
     }
@@ -297,36 +336,36 @@ class BGM {
                 // 处理配置变更
                 this.handleConfigChange(prop, value, oldValue);
                 return true;
-            }
+            },
         });
     }
     handleConfigChange(key, newValue, oldValue) {
         if (newValue === oldValue)
             return;
         switch (key) {
-            case 'enable':
+            case "enable":
                 if (newValue === false) {
                     this.clearFade();
                     this.stop();
                 }
                 break;
-            case 'volume':
+            case "volume":
                 if (this.audio) {
                     this.audio.volume = Math.max(0, Math.min(1, newValue));
-                    this.emit('volumechange', newValue);
+                    this.emit("volumechange", newValue);
                 }
                 break;
-            case 'rate':
+            case "rate":
                 if (this.audio) {
                     this.audio.playbackRate = newValue;
                 }
                 break;
-            case 'loop':
+            case "loop":
                 if (this.audio) {
                     this.audio.loop = newValue;
                 }
                 break;
-            case 'stopOnHidden':
+            case "stopOnHidden":
                 this.setupVisibilityHandler();
                 break;
         }
@@ -368,12 +407,16 @@ class BGM {
                 return;
             }
             return new Promise((resolve, reject) => {
-                const audio = new Audio(src);
+                let audio = new Audio(src);
+                this.Cache.set(id, src);
                 const onLoad = () => {
-                    this.Cache.set(id, src);
+                    audio = null;
                     resolve();
                 };
-                const onError = (e) => reject(e);
+                const onError = (e) => {
+                    audio = null;
+                    reject(e);
+                };
                 audio.addEventListener("canplaythrough", onLoad, { once: true });
                 audio.addEventListener("error", onError, { once: true });
                 audio.load();
@@ -483,7 +526,7 @@ class BGM {
         return this.configProxy;
     }
     set config(newConfig) {
-        Object.keys(newConfig).forEach(key => {
+        Object.keys(newConfig).forEach((key) => {
             const k = key;
             if (newConfig[k] !== undefined) {
                 this.configProxy[k] = newConfig[k];
@@ -930,27 +973,56 @@ class Music {
     constructor(src, metadata = {}, lrcUrl = null) {
         this.lyrics = [];
         this.lrcLoaded = false;
+        this.lrcLoading = false;
         this.src = src;
         this.metadata = metadata;
         this.lrcUrl = lrcUrl;
         this.metadataProxy = this.createMetadataProxy();
-        // 如果直接传了 lrc 文本，立即解析
         if (this.metadata.lrc) {
-            this.lyrics = Music.parseLyrics(this.metadata.lrc);
-            this.lrcLoaded = true;
+            if (Music.isURL(this.metadata.lrc)) {
+                if (!this.lrcUrl) {
+                    this.lrcUrl = this.metadata.lrc;
+                }
+            }
+            else {
+                this.lyrics = Music.parseLyrics(this.metadata.lrc);
+                this.lrcLoaded = true;
+            }
+        }
+    }
+    static isURL(str) {
+        try {
+            new URL(str);
+            return true;
+        }
+        catch (_a) {
+            return false;
         }
     }
     createMetadataProxy() {
         return new Proxy(this.metadata, {
             set: (target, prop, value) => {
                 target[prop] = value;
-                // 如果修改了 lrc，重新解析歌词
-                if (prop === 'lrc' && value) {
-                    this.lyrics = Music.parseLyrics(value);
-                    this.lrcLoaded = true;
+                if (prop === "lrc") {
+                    if (value) {
+                        if (Music.isURL(value)) {
+                            this.lrcUrl = value;
+                            this.lrcLoaded = false;
+                            this.lyrics = [];
+                        }
+                        else {
+                            this.lyrics = Music.parseLyrics(value);
+                            this.lrcLoaded = true;
+                        }
+                    }
+                    else {
+                        this.lrcUrl = null;
+                        this.lrcLoaded = false;
+                        this.lyrics = [];
+                    }
                 }
                 return true;
-            }
+            },
         });
     }
     get url() {
@@ -960,7 +1032,7 @@ class Music {
         return this.metadataProxy;
     }
     set meta(data) {
-        Object.keys(data).forEach(key => {
+        Object.keys(data).forEach((key) => {
             const k = key;
             if (data[k] !== undefined) {
                 this.metadataProxy[k] = data[k];
@@ -972,16 +1044,30 @@ class Music {
      */
     loadLyrics() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.lrcLoaded || !this.lrcUrl)
+            if (this.lrcLoaded || this.lrcLoading)
                 return;
+            let urlToFetch = null;
+            if (this.lrcUrl) {
+                urlToFetch = this.lrcUrl;
+            }
+            else if (this.metadata.lrc && Music.isURL(this.metadata.lrc)) {
+                urlToFetch = this.metadata.lrc;
+                this.lrcUrl = urlToFetch;
+            }
+            if (!urlToFetch)
+                return;
+            this.lrcLoading = true;
             try {
-                const text = yield fetch(this.lrcUrl).then(r => r.text());
+                const text = yield fetch(urlToFetch).then((r) => r.text());
                 this.lyrics = Music.parseLyrics(text);
+                this.lrcLoaded = true;
             }
             catch (_a) {
                 // Silently fail if lyrics cannot be fetched
             }
-            this.lrcLoaded = true;
+            finally {
+                this.lrcLoading = false;
+            }
         });
     }
     getLyrics() {
@@ -1008,7 +1094,10 @@ class Music {
     static parseLyrics(text) {
         try {
             const lrc = Lrc.parse(text);
-            return lrc.lyrics.map(line => ({ time: line.timestamp, text: line.content }));
+            return lrc.lyrics.map((line) => ({
+                time: line.timestamp,
+                text: line.content,
+            }));
         }
         catch (_a) {
             return [];
@@ -1063,7 +1152,7 @@ class MusicPlayer {
             stopOnHidden: false,
             preload: true,
             mode: PlayMode.SEQUENTIAL,
-            enable: true
+            enable: true,
         };
         this.audio = null;
         this.eventListeners = new Map();
@@ -1078,8 +1167,9 @@ class MusicPlayer {
         this.fadeTimer = null;
         this.preloadAudio = null;
         this.preloadSrc = null;
-        if (options.volume !== undefined)
+        if (options.volume !== undefined) {
             this.Config.volume = Math.max(0, Math.min(1, options.volume));
+        }
         if (options.rate !== undefined)
             this.Config.rate = options.rate;
         if (options.loop !== undefined)
@@ -1092,8 +1182,9 @@ class MusicPlayer {
         this.Config.fadeOut = resolveFadeMs(options.fade, options.fadeOut);
         if (options.preload !== undefined)
             this.Config.preload = options.preload;
-        if (options.stopOnHidden !== undefined)
+        if (options.stopOnHidden !== undefined) {
             this.Config.stopOnHidden = options.stopOnHidden;
+        }
         this.configProxy = this.createConfigProxy();
         this.setupVisibilityHandler();
     }
@@ -1105,41 +1196,41 @@ class MusicPlayer {
                 // 处理配置变更
                 this.handleConfigChange(prop, value, oldValue);
                 return true;
-            }
+            },
         });
     }
     handleConfigChange(key, newValue, oldValue) {
         if (newValue === oldValue)
             return;
         switch (key) {
-            case 'enable':
+            case "enable":
                 if (newValue === false) {
                     this.clearFade();
                     this.stop();
                 }
                 break;
-            case 'volume':
+            case "volume":
                 if (this.audio) {
                     this.audio.volume = Math.max(0, Math.min(1, newValue));
-                    this.emit('volumechange', newValue);
+                    this.emit("volumechange", newValue);
                 }
                 break;
-            case 'rate':
+            case "rate":
                 if (this.audio) {
                     this.audio.playbackRate = newValue;
                 }
                 break;
-            case 'loop':
+            case "loop":
                 if (this.audio) {
                     this.audio.loop = newValue;
                 }
                 break;
-            case 'mode':
+            case "mode":
                 if (newValue === PlayMode.SHUFFLE) {
                     this.rebuildShuffle();
                 }
                 break;
-            case 'stopOnHidden':
+            case "stopOnHidden":
                 this.setupVisibilityHandler();
                 break;
         }
@@ -1147,7 +1238,7 @@ class MusicPlayer {
     setupVisibilityHandler() {
         // 清理旧的监听器
         if (this.visibilityHandler) {
-            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            document.removeEventListener("visibilitychange", this.visibilityHandler);
             this.visibilityHandler = null;
         }
         // 如果启用 stopOnHidden，设置新的监听器
@@ -1164,11 +1255,11 @@ class MusicPlayer {
                     this.blocked = false;
                     if (this.pausedByHidden && this.audio) {
                         this.pausedByHidden = false;
-                        this.audio.play().catch(e => this.emit('error', e));
+                        this.audio.play().catch((e) => this.emit("error", e));
                     }
                 }
             };
-            document.addEventListener('visibilitychange', this.visibilityHandler);
+            document.addEventListener("visibilitychange", this.visibilityHandler);
         }
     }
     // ==================== 播放列表管理 ====================
@@ -1177,23 +1268,23 @@ class MusicPlayer {
         if (this.index === -1)
             this.index = 0;
         this.rebuildShuffle();
-        this.emit('playlistchange');
+        this.emit("playlistchange");
     }
     addList(musicList) {
         this.playlist.push(...musicList);
         if (this.index === -1 && this.playlist.length > 0)
             this.index = 0;
         this.rebuildShuffle();
-        this.emit('playlistchange');
+        this.emit("playlistchange");
     }
     addFromMeting(data) {
         return __awaiter(this, void 0, void 0, function* () {
-            const musicList = data.map(item => {
+            const musicList = data.map((item) => {
                 var _a, _b, _c, _d, _e, _f;
                 const metadata = {
                     title: (_a = item.name) !== null && _a !== void 0 ? _a : item.title,
                     artist: (_b = item.artist) !== null && _b !== void 0 ? _b : item.author,
-                    album: (_c = item.album) !== null && _c !== void 0 ? _c : '',
+                    album: (_c = item.album) !== null && _c !== void 0 ? _c : "",
                     cover: (_d = item.pic) !== null && _d !== void 0 ? _d : item.cover,
                 };
                 // 只存歌词 URL，播放时懒加载
@@ -1207,17 +1298,18 @@ class MusicPlayer {
         if (idx < 0 || idx >= this.playlist.length)
             return;
         this.playlist.splice(idx, 1);
-        if (this.index >= this.playlist.length)
+        if (this.index >= this.playlist.length) {
             this.index = this.playlist.length - 1;
+        }
         this.rebuildShuffle();
-        this.emit('playlistchange');
+        this.emit("playlistchange");
     }
     clear() {
         this.stop();
         this.playlist = [];
         this.index = -1;
         this.shuffleOrder = [];
-        this.emit('playlistchange');
+        this.emit("playlistchange");
     }
     // ==================== 播放控制 ====================
     play(idx) {
@@ -1233,8 +1325,9 @@ class MusicPlayer {
             }
             // 没有 audio 实例时，加载当前 index
             if (!this.audio) {
-                if (this.playlist.length === 0 || this.index < 0)
-                    throw new Error('No music to play');
+                if (this.playlist.length === 0 || this.index < 0) {
+                    throw new Error("No music to play");
+                }
                 yield this.loadAt(this.index);
                 return;
             }
@@ -1243,7 +1336,7 @@ class MusicPlayer {
             }
             catch (error) {
                 this._state = PlayState.ERROR;
-                this.emit('error', error);
+                this.emit("error", error);
                 throw error;
             }
         });
@@ -1262,10 +1355,10 @@ class MusicPlayer {
         this.pausedByHidden = false;
         this.audio.pause();
         this.audio.currentTime = 0;
-        this.audio.src = '';
+        this.audio.src = "";
         this.audio.load();
         this._state = PlayState.STOPPED;
-        this.emit('stop');
+        this.emit("stop");
     }
     playNext() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -1292,8 +1385,9 @@ class MusicPlayer {
     // ==================== 内部加载 ====================
     loadAt(idx) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (idx < 0 || idx >= this.playlist.length)
-                throw new Error('Invalid music index');
+            if (idx < 0 || idx >= this.playlist.length) {
+                throw new Error("Invalid music index");
+            }
             const music = this.playlist[idx];
             // 淡出并清理旧实例
             if (this.audio && !this.audio.paused) {
@@ -1301,7 +1395,7 @@ class MusicPlayer {
             }
             if (this.audio) {
                 this.audio.pause();
-                this.audio.src = '';
+                this.audio.src = "";
                 this.audio = null;
             }
             // 复用预加载的 audio（如果 src 匹配）
@@ -1313,7 +1407,7 @@ class MusicPlayer {
             else {
                 // 丢弃不匹配的预加载
                 if (this.preloadAudio) {
-                    this.preloadAudio.src = '';
+                    this.preloadAudio.src = "";
                     this.preloadAudio = null;
                     this.preloadSrc = null;
                 }
@@ -1326,7 +1420,7 @@ class MusicPlayer {
             this.lyricIndex = -1;
             this._state = PlayState.LOADING;
             this.setupEvents();
-            this.emit('musicchange', music);
+            this.emit("musicchange", music);
             // 歌词懒加载，不阻塞播放
             music.loadLyrics().catch(() => { });
             if (!this.blocked && this.Config.enable) {
@@ -1335,7 +1429,7 @@ class MusicPlayer {
                 }
                 catch (error) {
                     this._state = PlayState.ERROR;
-                    this.emit('error', error);
+                    this.emit("error", error);
                     throw error;
                 }
             }
@@ -1347,34 +1441,37 @@ class MusicPlayer {
     setupEvents() {
         if (!this.audio)
             return;
-        this.audio.addEventListener('play', () => {
+        this.audio.addEventListener("play", () => {
             this._state = PlayState.PLAYING;
-            this.emit('play');
+            this.emit("play");
         });
-        this.audio.addEventListener('pause', () => {
+        this.audio.addEventListener("pause", () => {
             this._state = PlayState.PAUSED;
-            this.emit('pause');
+            this.emit("pause");
         });
-        this.audio.addEventListener('ended', () => {
-            this.emit('ended');
+        this.audio.addEventListener("ended", () => {
+            this.emit("ended");
             this.handleEnded();
         });
-        this.audio.addEventListener('timeupdate', () => {
+        this.audio.addEventListener("timeupdate", () => {
             if (!this.audio)
                 return;
-            this.emit('timeupdate', { currentTime: this.audio.currentTime, duration: this.audio.duration });
+            this.emit("timeupdate", {
+                currentTime: this.audio.currentTime,
+                duration: this.audio.duration,
+            });
             this.updateLyric();
         });
-        this.audio.addEventListener('error', (e) => {
+        this.audio.addEventListener("error", (e) => {
             this._state = PlayState.ERROR;
-            this.emit('error', e);
+            this.emit("error", e);
         });
     }
     handleEnded() {
         return __awaiter(this, void 0, void 0, function* () {
             if (!this.Config.enable) {
                 this._state = PlayState.STOPPED;
-                this.emit('stop');
+                this.emit("stop");
                 return;
             }
             const nextIdx = this.resolveNext();
@@ -1383,7 +1480,7 @@ class MusicPlayer {
             }
             else {
                 this._state = PlayState.STOPPED;
-                this.emit('stop');
+                this.emit("stop");
             }
         });
     }
@@ -1400,13 +1497,13 @@ class MusicPlayer {
             return;
         // 清理旧的预加载
         if (this.preloadAudio) {
-            this.preloadAudio.src = '';
+            this.preloadAudio.src = "";
             this.preloadAudio = null;
         }
         // 预加载音频
         this.preloadSrc = next.url;
         this.preloadAudio = new Audio();
-        this.preloadAudio.preload = 'auto';
+        this.preloadAudio.preload = "auto";
         this.preloadAudio.src = next.url;
         this.preloadAudio.volume = 0;
         this.preloadAudio.load();
@@ -1452,7 +1549,8 @@ class MusicPlayer {
                 return this.index;
             case PlayMode.SHUFFLE: {
                 const pos = this.shuffleOrder.indexOf(this.index);
-                return this.shuffleOrder[pos === 0 ? this.shuffleOrder.length - 1 : pos - 1];
+                return this
+                    .shuffleOrder[pos === 0 ? this.shuffleOrder.length - 1 : pos - 1];
             }
             case PlayMode.LOOP:
                 return this.index === 0 ? this.playlist.length - 1 : this.index - 1;
@@ -1466,7 +1564,10 @@ class MusicPlayer {
         this.shuffleOrder = Array.from({ length: this.playlist.length }, (_, i) => i);
         for (let i = this.shuffleOrder.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [this.shuffleOrder[i], this.shuffleOrder[j]] = [this.shuffleOrder[j], this.shuffleOrder[i]];
+            [this.shuffleOrder[i], this.shuffleOrder[j]] = [
+                this.shuffleOrder[j],
+                this.shuffleOrder[i],
+            ];
         }
     }
     updateLyric() {
@@ -1484,53 +1585,92 @@ class MusicPlayer {
         }
         if (newIndex !== this.lyricIndex) {
             this.lyricIndex = newIndex;
-            this.emit('lyricchange', this.lyric);
+            this.emit("lyricchange", this.lyric);
         }
     }
     // ==================== Getters & Setters ====================
-    get volume() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.volume) !== null && _b !== void 0 ? _b : this.Config.volume; }
+    get audioElement() {
+        return this.audio;
+    }
+    get volume() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.volume) !== null && _b !== void 0 ? _b : this.Config.volume;
+    }
     set volume(value) {
         const vol = Math.max(0, Math.min(1, value));
         this.Config.volume = vol;
         if (this.audio) {
             this.audio.volume = vol;
-            this.emit('volumechange', vol);
+            this.emit("volumechange", vol);
         }
     }
-    get rate() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.playbackRate) !== null && _b !== void 0 ? _b : this.Config.rate; }
+    get rate() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.playbackRate) !== null && _b !== void 0 ? _b : this.Config.rate;
+    }
     set rate(value) {
         this.Config.rate = value;
         if (this.audio)
             this.audio.playbackRate = value;
     }
-    get loop() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.loop) !== null && _b !== void 0 ? _b : this.Config.loop; }
+    get loop() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.loop) !== null && _b !== void 0 ? _b : this.Config.loop;
+    }
     set loop(value) {
         this.Config.loop = value;
         if (this.audio)
             this.audio.loop = value;
     }
-    get currentTime() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.currentTime) !== null && _b !== void 0 ? _b : 0; }
-    set currentTime(value) { if (this.audio)
-        this.audio.currentTime = value; }
-    get duration() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.duration) !== null && _b !== void 0 ? _b : 0; }
-    get paused() { var _a, _b; return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.paused) !== null && _b !== void 0 ? _b : true; }
-    get state() { return this._state; }
-    get progress() { return this.duration > 0 ? this.currentTime / this.duration : 0; }
-    set progress(value) { this.currentTime = value * this.duration; }
+    get currentTime() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.currentTime) !== null && _b !== void 0 ? _b : 0;
+    }
+    set currentTime(value) {
+        if (this.audio)
+            this.audio.currentTime = value;
+    }
+    get duration() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.duration) !== null && _b !== void 0 ? _b : 0;
+    }
+    get paused() {
+        var _a, _b;
+        return (_b = (_a = this.audio) === null || _a === void 0 ? void 0 : _a.paused) !== null && _b !== void 0 ? _b : true;
+    }
+    get state() {
+        return this._state;
+    }
+    get progress() {
+        return this.duration > 0 ? this.currentTime / this.duration : 0;
+    }
+    set progress(value) {
+        this.currentTime = value * this.duration;
+    }
     get current() {
-        return this.index >= 0 && this.index < this.playlist.length ? this.playlist[this.index] : null;
+        return this.index >= 0 && this.index < this.playlist.length
+            ? this.playlist[this.index]
+            : null;
     }
     get(idx) {
         return idx >= 0 && idx < this.playlist.length ? this.playlist[idx] : null;
     }
-    getAll() { return [...this.playlist]; }
-    get length() { return this.playlist.length; }
-    get currentIndex() { return this.index; }
+    getAll() {
+        return [...this.playlist];
+    }
+    get length() {
+        return this.playlist.length;
+    }
+    get currentIndex() {
+        return this.index;
+    }
     set currentIndex(value) {
         if (value >= 0 && value < this.playlist.length)
             this.index = value;
     }
-    get playMode() { return this.Config.mode; }
+    get playMode() {
+        return this.Config.mode;
+    }
     set playMode(value) {
         this.Config.mode = value;
         if (value === PlayMode.SHUFFLE)
@@ -1540,7 +1680,7 @@ class MusicPlayer {
         return this.configProxy;
     }
     set config(newConfig) {
-        Object.keys(newConfig).forEach(key => {
+        Object.keys(newConfig).forEach((key) => {
             const k = key;
             if (newConfig[k] !== undefined) {
                 this.configProxy[k] = newConfig[k];
@@ -1552,13 +1692,19 @@ class MusicPlayer {
         if (!music)
             return null;
         const lyrics = music.getLyrics();
-        return this.lyricIndex >= 0 && this.lyricIndex < lyrics.length ? lyrics[this.lyricIndex] : null;
+        return this.lyricIndex >= 0 && this.lyricIndex < lyrics.length
+            ? lyrics[this.lyricIndex]
+            : null;
     }
-    getLyrics() { var _a, _b; return (_b = (_a = this.current) === null || _a === void 0 ? void 0 : _a.getLyrics()) !== null && _b !== void 0 ? _b : []; }
+    getLyrics() {
+        var _a, _b;
+        return (_b = (_a = this.current) === null || _a === void 0 ? void 0 : _a.getLyrics()) !== null && _b !== void 0 ? _b : [];
+    }
     // ==================== Events ====================
     on(event, listener) {
-        if (!this.eventListeners.has(event))
+        if (!this.eventListeners.has(event)) {
             this.eventListeners.set(event, new Set());
+        }
         this.eventListeners.get(event).add(listener);
     }
     off(event, listener) {
@@ -1567,23 +1713,23 @@ class MusicPlayer {
     }
     emit(event, data) {
         var _a;
-        (_a = this.eventListeners.get(event)) === null || _a === void 0 ? void 0 : _a.forEach(listener => listener(data));
+        (_a = this.eventListeners.get(event)) === null || _a === void 0 ? void 0 : _a.forEach((listener) => listener(data));
     }
     destroy() {
         this.clearFade();
         this.stop();
         if (this.audio) {
-            this.audio.src = '';
+            this.audio.src = "";
             this.audio.load();
             this.audio = null;
         }
         if (this.preloadAudio) {
-            this.preloadAudio.src = '';
+            this.preloadAudio.src = "";
             this.preloadAudio = null;
             this.preloadSrc = null;
         }
         if (this.visibilityHandler) {
-            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            document.removeEventListener("visibilitychange", this.visibilityHandler);
             this.visibilityHandler = null;
         }
         this.eventListeners.clear();

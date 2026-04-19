@@ -229,13 +229,15 @@ new Music(src: string, metadata?: Metadata, lrcUrl?: string | null)
 | `artist` | `string` | Artist name |
 | `album` | `string` | Album name |
 | `cover` | `string` | Cover image URL |
-| `lrc` | `string` | LRC lyrics text |
+| `lrc` | `string` | LRC lyrics text or lyrics file URL |
 | `duration` | `number` | Track duration (seconds) |
 
 ### Methods
 
 #### `loadLyrics(): Promise<void>`
-Load lyrics from the LRC URL (lazy loading).
+Load lyrics from lyrics URL (lazy loading). Supports the following sources:
+- The `lrcUrl` parameter from constructor
+- URL format string in `metadata.lrc`
 
 #### `getLyrics(): Lyric[]`
 Get parsed lyrics array.
@@ -265,6 +267,36 @@ music.meta = { title: 'New Title' };  // Also works
 
 // LRC auto-parsing
 music.meta.lrc = '[00:12.00]Hello world';  // Lyrics parsed automatically
+
+// LRC URL support (lazy loading)
+music.meta.lrc = 'https://example.com/lyrics.lrc';  // Detected as URL, fetched on playback
+```
+
+### Lyrics Loading Methods
+
+Music class supports multiple ways to load lyrics:
+
+```javascript
+// Method 1: Pass LRC text directly (immediate parsing)
+const song1 = new Music('song1.mp3', {
+  title: 'Song Title',
+  lrc: '[00:12.00]First line\n[00:15.00]Second line'
+});
+
+// Method 2: Pass URL via metadata.lrc (lazy loading)
+const song2 = new Music('song2.mp3', {
+  title: 'Song Title',
+  lrc: 'https://example.com/lyrics.lrc'  // Auto-detected as URL
+});
+
+// Method 3: Pass URL via lrcUrl parameter (lazy loading)
+const song3 = new Music('song3.mp3', {
+  title: 'Song Title'
+}, 'https://example.com/lyrics.lrc');
+
+// Method 4: Set lyrics dynamically
+song1.meta.lrc = '[00:00.00]New lyrics';  // LRC text, parsed immediately
+song1.meta.lrc = 'https://example.com/new.lrc';  // URL, lazy loaded
 ```
 
 ### Static Methods
@@ -341,6 +373,7 @@ Play previous track according to play mode.
 
 | Property | Type | Description |
 |----------|------|-------------|
+| `audioElement` | `HTMLAudioElement \| null` | Underlying audio element (read-only) |
 | `volume` | `number` | Current volume (0-1), setter applies immediately |
 | `rate` | `number` | Current playback rate, setter applies immediately |
 | `loop` | `boolean` | Track loop enabled, setter applies immediately |

@@ -13,6 +13,7 @@ export class Music {
   private lyrics: Lyric[] = [];
   private lrcUrl: string | null;
   private lrcLoaded: boolean = false;
+  private lrcLoading: boolean = false;
 
   constructor(
     src: string,
@@ -25,10 +26,24 @@ export class Music {
 
     this.metadataProxy = this.createMetadataProxy();
 
-    // 如果直接传了 lrc 文本，立即解析
     if (this.metadata.lrc) {
-      this.lyrics = Music.parseLyrics(this.metadata.lrc);
-      this.lrcLoaded = true;
+      if (Music.isURL(this.metadata.lrc)) {
+        if (!this.lrcUrl) {
+          this.lrcUrl = this.metadata.lrc;
+        }
+      } else {
+        this.lyrics = Music.parseLyrics(this.metadata.lrc);
+        this.lrcLoaded = true;
+      }
+    }
+  }
+
+  private static isURL(str: string): boolean {
+    try {
+      new URL(str);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -37,10 +52,21 @@ export class Music {
       set: (target, prop: string, value) => {
         (target as any)[prop] = value;
 
-        // 如果修改了 lrc，重新解析歌词
-        if (prop === "lrc" && value) {
-          this.lyrics = Music.parseLyrics(value);
-          this.lrcLoaded = true;
+        if (prop === "lrc") {
+          if (value) {
+            if (Music.isURL(value)) {
+              this.lrcUrl = value;
+              this.lrcLoaded = false;
+              this.lyrics = [];
+            } else {
+              this.lyrics = Music.parseLyrics(value);
+              this.lrcLoaded = true;
+            }
+          } else {
+            this.lrcUrl = null;
+            this.lrcLoaded = false;
+            this.lyrics = [];
+          }
         }
         return true;
       },
@@ -68,14 +94,29 @@ export class Music {
    * 懒加载歌词，播放时调用，已加载则直接返回
    */
   async loadLyrics(): Promise<void> {
-    if (this.lrcLoaded || !this.lrcUrl) return;
+    if (this.lrcLoaded || this.lrcLoading) return;
+    
+    let urlToFetch: string | null = null;
+    
+    if (this.lrcUrl) {
+      urlToFetch = this.lrcUrl;
+    } else if (this.metadata.lrc && Music.isURL(this.metadata.lrc)) {
+      urlToFetch = this.metadata.lrc;
+      this.lrcUrl = urlToFetch;
+    }
+    
+    if (!urlToFetch) return;
+    
+    this.lrcLoading = true;
     try {
-      const text = await fetch(this.lrcUrl).then((r) => r.text());
+      const text = await fetch(urlToFetch).then((r) => r.text());
       this.lyrics = Music.parseLyrics(text);
+      this.lrcLoaded = true;
     } catch {
       // Silently fail if lyrics cannot be fetched
+    } finally {
+      this.lrcLoading = false;
     }
-    this.lrcLoaded = true;
   }
 
   getLyrics(): Lyric[] {
